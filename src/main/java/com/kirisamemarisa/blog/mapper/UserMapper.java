@@ -3,31 +3,11 @@ package com.kirisamemarisa.blog.mapper;
 import com.kirisamemarisa.blog.dto.UserRegisterDTO;
 import com.kirisamemarisa.blog.dto.UserLoginDTO;
 import com.kirisamemarisa.blog.model.User;
+import org.mapstruct.Mapper;
 
-public class UserMapper {
-    public static User toUser(UserRegisterDTO dto) {
-        User user = new User();
-        user.setUsername(dto.getUsername());
-        user.setPassword(dto.getPassword());
-        user.setNickname(dto.getNickname());
-        user.setGender(dto.getGender());
-        return user;
-    }
-
-    //没有啥必要
-    public static User toUser(UserLoginDTO dto) {
-        User user = new User();
-        user.setUsername(dto.getUsername());
-        user.setPassword(dto.getPassword());
-        return user;
-    }
-
-    public static UserRegisterDTO toRegisterDTO(User user) {
-        UserRegisterDTO dto = new UserRegisterDTO();
-        dto.setUsername(user.getUsername());
-        //密码不返回给前端
-        dto.setNickname(user.getNickname());
-        dto.setGender(user.getGender());
-        return dto;
-    }
+@Mapper(componentModel = "spring")
+public interface UserMapper {
+    User toUser(UserRegisterDTO dto);
+    User toUser(UserLoginDTO dto);
+    UserRegisterDTO toRegisterDTO(User user);
 }

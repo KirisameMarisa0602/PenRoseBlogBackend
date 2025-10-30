@@ -16,6 +16,18 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+    /*
+    这里的 userMapper 对象，
+    实际上是由 Spring 容器自动注入的 MapStruct 框架生成的 UserMapperImpl 实现类实例。
+    具体原理如下：
+    你定义了 UserMapper 接口，并用 @Mapper(componentModel = "spring") 注解。
+    MapStruct 在编译时自动生成 UserMapperImpl 实现类，负责 DTO 和实体的转换。
+    因为 componentModel = "spring"，MapStruct 生成的实现类会被注册为 Spring Bean。
+    所以 @Autowired 注入的 userMapper 实际就是 UserMapperImpl 的实例，可以直接调用接口方法实现自动转换。
+    */
+    @Autowired
+    private UserMapper userMapper;
+
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public ApiResponse<Void> register(UserRegisterDTO userRegisterDTO) {
@@ -32,7 +44,7 @@ public class UserService {
         if (userRepository.findByUsername(username) != null) {
             return new ApiResponse<>(400, "用户名已存在", null);
         }
-        User user = UserMapper.toUser(userRegisterDTO);
+        User user = userMapper.toUser(userRegisterDTO);
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
         return new ApiResponse<>(200, "注册成功", null);
