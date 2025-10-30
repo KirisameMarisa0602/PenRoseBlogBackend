@@ -21,8 +21,7 @@ public class UserController {
 
     // 登录接口
     @PostMapping("/login")
-    public ApiResponse<Void> login(@RequestBody UserLoginDTO userLoginDTO) {
+    public ApiResponse<String> login(@RequestBody UserLoginDTO userLoginDTO) {
         return userService.login(userLoginDTO);
     }
 }
-

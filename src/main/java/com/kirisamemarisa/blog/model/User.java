@@ -20,8 +20,8 @@ public class User {
     //密码非空，8-12位，仅数字和字母，加密后最长100字符
     private String password;
 
-    @Column(length = 15)
-    //昵称，最长15个字符
+    @Column(length = 25)
+    //昵称，最长25个字符
     private String nickname;
 
     @Column(length = 2)
