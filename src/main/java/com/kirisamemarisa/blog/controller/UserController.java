@@ -37,13 +37,12 @@ public class UserController {
     }
 
     // 更新用户个人信息
-    @PutMapping("/profile")
-    public ApiResponse<Void> updateProfile(@RequestBody UserProfileDTO userProfileDTO) {
-        boolean success = userService.updateUserProfile(userProfileDTO);
-        if (success) {
-            return new ApiResponse<>(200, "更新成功", null);
-        } else {
-            return new ApiResponse<>(400, "更新失败", null);
-        }
+    @PutMapping("/profile/{userId}")
+    public ApiResponse<Void> updateProfile(@PathVariable Long userId,
+                                           @RequestBody UserProfileDTO userProfileDTO) {
+        boolean ok = userService.updateUserProfile(userId, userProfileDTO);
+        return ok ? new ApiResponse<>(200, "更新成功", null)
+                : new ApiResponse<>(400, "更新失败", null);
     }
+
 }
