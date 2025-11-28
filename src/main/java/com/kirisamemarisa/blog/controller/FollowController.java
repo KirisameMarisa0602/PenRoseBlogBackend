@@ -1,0 +1,110 @@
+package com.kirisamemarisa.blog.controller;
+
+import com.kirisamemarisa.blog.common.ApiResponse;
+import com.kirisamemarisa.blog.model.User;
+import com.kirisamemarisa.blog.repository.UserRepository;
+import com.kirisamemarisa.blog.service.FollowService;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * 关注相关接口：兼容未登录测试（通过 X-User-Id 头传当前用户ID）。
+ */
+@RestController
+@RequestMapping("/api/follow")
+public class FollowController {
+
+    private final UserRepository userRepository;
+    private final FollowService followService;
+
+    public FollowController(UserRepository userRepository, FollowService followService) {
+        this.userRepository = userRepository;
+        this.followService = followService;
+    }
+
+    private User resolveCurrentUser(UserDetails principal, Long headerUserId) {
+        if (principal != null) {
+            return userRepository.findByUsername(principal.getUsername());
+        }
+        if (headerUserId != null) {
+            return userRepository.findById(headerUserId).orElse(null);
+        }
+        return null;
+    }
+
+    @PostMapping("/{targetId}")
+    public ApiResponse<Void> follow(@PathVariable Long targetId,
+                                    @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+                                    @AuthenticationPrincipal UserDetails principal) {
+        User me = resolveCurrentUser(principal, headerUserId);
+        if (me == null) {
+            return new ApiResponse<>(401, "未认证", null);
+        }
+        User target = userRepository.findById(targetId).orElse(null);
+        if (target == null) {
+            return new ApiResponse<>(404, "目标用户不存在", null);
+        }
+        if (me.getId().equals(targetId)) {
+            return new ApiResponse<>(400, "不能关注自己", null);
+        }
+        followService.follow(me, target);
+        return new ApiResponse<>(200, "关注成功", null);
+    }
+
+    @DeleteMapping("/{targetId}")
+    public ApiResponse<Void> unfollow(@PathVariable Long targetId,
+                                      @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+                                      @AuthenticationPrincipal UserDetails principal) {
+        User me = resolveCurrentUser(principal, headerUserId);
+        if (me == null) {
+            return new ApiResponse<>(401, "未认证", null);
+        }
+        User target = userRepository.findById(targetId).orElse(null);
+        if (target == null) {
+            return new ApiResponse<>(404, "目标用户不存在", null);
+        }
+        followService.unfollow(me, target);
+        return new ApiResponse<>(200, "取关成功", null);
+    }
+
+    @GetMapping("/followers")
+    public ApiResponse<List<User>> followers(@RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+                                             @AuthenticationPrincipal UserDetails principal) {
+        User me = resolveCurrentUser(principal, headerUserId);
+        if (me == null) {
+            return new ApiResponse<>(401, "未认证", null);
+        }
+        List<User> list = followService.listFollowers(me);
+        return new ApiResponse<>(200, "获取成功", list);
+    }
+
+    @GetMapping("/following")
+    public ApiResponse<List<User>> following(@RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+                                             @AuthenticationPrincipal UserDetails principal) {
+        User me = resolveCurrentUser(principal, headerUserId);
+        if (me == null) {
+            return new ApiResponse<>(401, "未认证", null);
+        }
+        List<User> list = followService.listFollowing(me);
+        return new ApiResponse<>(200, "获取成功", list);
+    }
+
+    @GetMapping("/friends/{otherId}")
+    public ApiResponse<Boolean> isFriends(@PathVariable Long otherId,
+                                          @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+                                          @AuthenticationPrincipal UserDetails principal) {
+        User me = resolveCurrentUser(principal, headerUserId);
+        if (me == null) {
+            return new ApiResponse<>(401, "未认证", null);
+        }
+        User other = userRepository.findById(otherId).orElse(null);
+        if (other == null) {
+            return new ApiResponse<>(404, "用户不存在", null);
+        }
+        boolean friends = followService.areFriends(me, other);
+        return new ApiResponse<>(200, "OK", friends);
+    }
+}
