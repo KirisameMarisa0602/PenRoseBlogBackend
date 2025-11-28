@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 import java.util.List;
+import com.kirisamemarisa.blog.dto.PageResult;
+import org.springframework.data.domain.Page;
 
 @Service public class BlogPostServiceImpl implements BlogPostService {
     private final BlogPostRepository blogPostRepository;
@@ -179,12 +181,25 @@ import java.util.List;
 
 
     @Override
+    public PageResult<BlogPostDTO> pageList(int page, int size, Long currentUserId) {
+        Page<BlogPost> blogPage = blogPostRepository.findAll(PageRequest.of(page, size));
+        List<BlogPostDTO> dtoList = blogPage.getContent().stream().map(post -> {
+            UserProfile profile = userProfileRepository.findById(post.getUser().getId()).orElse(null);
+            return blogPostMapper.toDTOWithProfile(post, profile);
+        }).toList();
+        return new PageResult<>(dtoList, blogPage.getTotalElements(), page, size);
+    }
+
+    @Override
     public List<BlogPostDTO> list(int page, int size, Long currentUserId) {
-        // 示例实现，实际可根据业务需求调整
-        return blogPostRepository.findAll(PageRequest.of(page, size))
-                .stream()
-                .map(blogPostMapper::toDTO)
-                .toList();
+        return pageList(page, size, currentUserId).getList();
+    }
+
+    @Override
+    public PageResult<CommentDTO> pageComments(Long blogPostId, int page, int size, Long currentUserId) {
+        Page<Comment> commentPage = commentRepository.findByBlogPostIdOrderByCreatedAtDesc(blogPostId, PageRequest.of(page, size));
+        List<CommentDTO> dtoList = commentPage.getContent().stream().map(c -> toCommentDTO(c, currentUserId)).toList();
+        return new PageResult<>(dtoList, commentPage.getTotalElements(), page, size);
     }
 
     private CommentDTO toCommentDTO(Comment c, Long currentUserId) {
