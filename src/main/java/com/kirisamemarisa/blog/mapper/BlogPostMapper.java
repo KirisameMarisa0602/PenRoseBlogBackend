@@ -32,9 +32,18 @@ public interface BlogPostMapper {
 
     default BlogPostDTO toDTOWithProfile(BlogPost entity, UserProfile profile) {
         BlogPostDTO dto = toDTO(entity);
+        if (dto == null) return null;
         if (profile != null) {
             dto.setAuthorNickname(profile.getNickname());
             dto.setAuthorAvatarUrl(profile.getAvatarUrl());
+        } else {
+            // fallback: if profile missing, try to set nickname from User.username
+            if (entity != null && entity.getUser() != null && entity.getUser().getUsername() != null) {
+                dto.setAuthorNickname(entity.getUser().getUsername());
+            } else {
+                dto.setAuthorNickname("");
+            }
+            dto.setAuthorAvatarUrl("");
         }
         return dto;
     }

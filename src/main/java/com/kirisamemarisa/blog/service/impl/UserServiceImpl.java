@@ -27,6 +27,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -42,10 +45,10 @@ public class UserServiceImpl implements UserService {
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    @Value("${user.avatar.base-path}")
-    private String avatarBasePath;
-    @Value("${user.background.base-path}")
-    private String backgroundBasePath;
+    @Value("${resource.avatar-location}")
+    private String avatarLocation;
+    @Value("${resource.background-location}")
+    private String backgroundLocation;
 
     @Override
     @Transactional
@@ -155,17 +158,21 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException("文件为空");
         String ext = org.springframework.util.StringUtils.getFilenameExtension(file.getOriginalFilename());
         String filename = UUID.randomUUID() + (ext != null ? "." + ext : "");
-        String userDir = avatarBasePath + userId + File.separator;
-        File dir = new File(userDir);
-        if (!dir.exists() && !dir.mkdirs()) {
+        Path baseDir = Paths.get(toLocalPath(avatarLocation)).toAbsolutePath().normalize();
+        Path userDir = baseDir.resolve(String.valueOf(userId)).normalize();
+        try {
+            if (!userDir.startsWith(baseDir)) throw new BusinessException("非法的用户目录");
+            Files.createDirectories(userDir);
+        } catch (IOException e) {
             throw new BusinessException("头像目录创建失败");
         }
         // 路径安全校验，防止路径穿越
-        if (filename.contains("..") || filename.contains("/")) {
+        if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
             throw new BusinessException("非法文件名");
         }
-        File dest = new File(dir, filename);
+        Path destPath = userDir.resolve(filename).normalize();
         try {
+            File dest = destPath.toFile();
             file.transferTo(dest);
         } catch (IOException e) {
             throw new BusinessException("头像上传失败");
@@ -187,17 +194,21 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException("文件为空");
         String ext = org.springframework.util.StringUtils.getFilenameExtension(file.getOriginalFilename());
         String filename = UUID.randomUUID() + (ext != null ? "." + ext : "");
-        String userDir = backgroundBasePath + userId + File.separator;
-        File dir = new File(userDir);
-        if (!dir.exists() && !dir.mkdirs()) {
+        Path baseDir = Paths.get(toLocalPath(backgroundLocation)).toAbsolutePath().normalize();
+        Path userDir = baseDir.resolve(String.valueOf(userId)).normalize();
+        try {
+            if (!userDir.startsWith(baseDir)) throw new BusinessException("非法的用户目录");
+            Files.createDirectories(userDir);
+        } catch (IOException e) {
             throw new BusinessException("背景目录创建失败");
         }
         // 路径安全校验，防止路径穿越
-        if (filename.contains("..") || filename.contains("/")) {
+        if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
             throw new BusinessException("非法文件名");
         }
-        File dest = new File(dir, filename);
+        Path destPath = userDir.resolve(filename).normalize();
         try {
+            File dest = destPath.toFile();
             file.transferTo(dest);
         } catch (IOException e) {
             throw new BusinessException("背景上传失败");
@@ -211,6 +222,16 @@ public class UserServiceImpl implements UserService {
         profile.setBackgroundUrl(url);
         userProfileRepository.save(profile);
         return url;
+    }
+
+    private String toLocalPath(String configured) {
+        if (configured == null) return "";
+        String v = configured;
+        if (v.startsWith("file:")) v = v.substring(5);
+        if (!v.endsWith(File.separator) && !v.endsWith("/")) {
+            v = v + File.separator;
+        }
+        return v.replace('/', File.separatorChar);
     }
 
     @Override

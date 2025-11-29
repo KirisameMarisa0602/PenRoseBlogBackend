@@ -3,6 +3,7 @@ package com.kirisamemarisa.blog.service;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.*;
 import com.kirisamemarisa.blog.dto.PageResult;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -18,4 +19,6 @@ public interface BlogPostService {
     ApiResponse<Long> repost(RepostCreateDTO dto);
     PageResult<BlogPostDTO> pageList(int page, int size, Long currentUserId);
     PageResult<CommentDTO> pageComments(Long blogPostId, int page, int size, Long currentUserId);
+    ApiResponse<Long> createWithCover(String title, String content, Long userId, String directory, MultipartFile cover);
+    ApiResponse<Boolean> updateWithCover(Long id, String content, String directory, MultipartFile cover);
 }

@@ -14,10 +14,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 import java.util.Optional;
 import java.util.List;
 import com.kirisamemarisa.blog.dto.PageResult;
 import org.springframework.data.domain.Page;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 
 @Service
 public class BlogPostServiceImpl implements BlogPostService {
@@ -28,8 +35,11 @@ public class BlogPostServiceImpl implements BlogPostService {
     private final BlogPostLikeRepository blogPostLikeRepository;
     private final CommentLikeRepository commentLikeRepository;
     private final UserProfileRepository userProfileRepository;
-    private final BlogPostMapper blogPostMapper;
+    private final BlogPostMapper blogpostMapper;
     private final CommentService commentService; // 新增依赖
+
+    @Value("${resource.blogpostcover-location}")
+    private String blogpostcoverLocation;
 
     public BlogPostServiceImpl(BlogPostRepository blogPostRepository,
             UserRepository userRepository,
@@ -37,7 +47,7 @@ public class BlogPostServiceImpl implements BlogPostService {
             BlogPostLikeRepository blogPostLikeRepository,
             CommentLikeRepository commentLikeRepository,
             UserProfileRepository userProfileRepository,
-            BlogPostMapper blogPostMapper,
+            BlogPostMapper blogpostMapper,
             CommentService commentService) { // 注入 CommentService
         this.blogPostRepository = blogPostRepository;
         this.userRepository = userRepository;
@@ -45,7 +55,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         this.blogPostLikeRepository = blogPostLikeRepository;
         this.commentLikeRepository = commentLikeRepository;
         this.userProfileRepository = userProfileRepository;
-        this.blogPostMapper = blogPostMapper;
+        this.blogpostMapper = blogpostMapper;
         this.commentService = commentService; // 初始化 CommentService
     }
 
@@ -78,9 +88,13 @@ public class BlogPostServiceImpl implements BlogPostService {
     @Override
     @Transactional(readOnly = true)
     public BlogPostDTO getById(Long id, Long currentUserId) {
-        BlogPostDTO dto = blogPostRepository.findById(id).map(blogPostMapper::toDTO).orElse(null);
+        Optional<BlogPost> opt = blogPostRepository.findById(id);
+        if (opt.isEmpty()) return null;
+        BlogPost post = opt.get();
+        // load author profile (may be absent)
+        UserProfile profile = userProfileRepository.findById(post.getUser().getId()).orElse(null);
+        BlogPostDTO dto = blogpostMapper.toDTOWithProfile(post, profile);
         if (dto != null && currentUserId != null) {
-            // 检查当前用户是否点赞
             boolean liked = blogPostLikeRepository.findByBlogPostIdAndUserId(id, currentUserId).isPresent();
             dto.setLikedByCurrentUser(liked);
         }
@@ -114,7 +128,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         if (dto.getDirectory() != null)
             post.setDirectory(dto.getDirectory());
         // 支持后续字段扩展
-        blogPostMapper.updateEntityFromDTO(dto, post);
+        blogpostMapper.updateEntityFromDTO(dto, post);
         blogPostRepository.save(post);
         return new ApiResponse<>(200, "更新成功", true);
     }
@@ -223,7 +237,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         }
         List<BlogPostDTO> dtoList = posts.stream().map(post -> {
             UserProfile profile = profileMap.get(post.getUser().getId());
-            return blogPostMapper.toDTOWithProfile(post, profile);
+            return blogpostMapper.toDTOWithProfile(post, profile);
         }).toList();
         return new PageResult<>(dtoList, blogPage.getTotalElements(), page, size);
     }
@@ -253,11 +267,141 @@ public class BlogPostServiceImpl implements BlogPostService {
             dto.setLikedByCurrentUser(
                     commentLikeRepository.findByCommentIdAndUserId(c.getId(), currentUserId).isPresent());
         }
-        userProfileRepository.findById(c.getUser().getId()).ifPresent(p -> {
-            dto.setNickname(p.getNickname());
-            dto.setAvatarUrl(p.getAvatarUrl());
-        });
+        UserProfile up = userProfileRepository.findById(c.getUser().getId()).orElse(null);
+        if (up != null) {
+            dto.setNickname(up.getNickname() != null ? up.getNickname() : "");
+            dto.setAvatarUrl(up.getAvatarUrl() != null ? up.getAvatarUrl() : "");
+        } else {
+            // fallback to username
+            dto.setNickname(c.getUser() != null && c.getUser().getUsername() != null ? c.getUser().getUsername() : "");
+            dto.setAvatarUrl("");
+        }
         return dto;
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Long> createWithCover(String title, String content, Long userId, String directory, MultipartFile cover) {
+        if (title == null || title.trim().isEmpty())
+            return new ApiResponse<>(400, "标题不能为空", null);
+        if (content == null || content.trim().isEmpty())
+            return new ApiResponse<>(400, "正文不能为空", null);
+        if (userId == null)
+            return new ApiResponse<>(400, "用户ID不能为空", null);
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty())
+            return new ApiResponse<>(404, "用户不存在", null);
+        BlogPost post = new BlogPost();
+        post.setTitle(title.trim());
+        post.setContent(content.trim());
+        post.setDirectory(directory);
+        post.setUser(userOpt.get());
+        post.setRepost(false);
+        BlogPost saved = blogPostRepository.save(post);
+        // 保存封面文件
+        if (cover != null && !cover.isEmpty()) {
+            Path baseDir = Paths.get(toLocalPath(blogpostcoverLocation));
+            Path dirPath = baseDir.resolve(String.valueOf(userId)).resolve(String.valueOf(saved.getId()));
+            try {
+                Files.createDirectories(dirPath);
+            } catch (IOException e) {
+                logger.error("无法创建目录: {}", dirPath, e);
+                return new ApiResponse<>(500, "封面上传失败（无法创建目录）", null);
+            }
+            // sanitize filename to avoid path traversal — allow only limited characters
+            String rawName = cover.getOriginalFilename();
+            String safeName = sanitizeFilename(rawName);
+            if (safeName.isEmpty()) safeName = String.valueOf(System.currentTimeMillis());
+            String fileName = System.currentTimeMillis() + "_" + safeName;
+            Path destPath = dirPath.resolve(fileName).normalize();
+            try {
+                Path allowed = dirPath.toAbsolutePath().normalize();
+                if (!destPath.startsWith(allowed)) {
+                    logger.warn("尝试写入不允许的位置: {} (allowed: {})", destPath, allowed);
+                    return new ApiResponse<>(400, "非法的文件路径", null);
+                }
+                File destFile = destPath.toFile();
+                cover.transferTo(destFile);
+                String url = "/sources/blogpostcover/" + userId + "/" + saved.getId() + "/" + fileName;
+                saved.setCoverImageUrl(url);
+                blogPostRepository.save(saved);
+            } catch (IOException e) {
+                logger.error("封面上传异常", e);
+                return new ApiResponse<>(500, "封面上传失败", null);
+            }
+        }
+        return new ApiResponse<>(200, "创建成功", saved.getId());
+    }
+
+    @Override
+    @Transactional
+    public ApiResponse<Boolean> updateWithCover(Long id, String content, String directory, MultipartFile cover) {
+        Optional<BlogPost> opt = blogPostRepository.findById(id);
+        if (opt.isEmpty())
+            return new ApiResponse<>(404, "博客不存在", false);
+        BlogPost post = opt.get();
+        if (content != null && !content.trim().isEmpty())
+            post.setContent(content.trim());
+        if (directory != null)
+            post.setDirectory(directory);
+        // 保存新封面文件
+        if (cover != null && !cover.isEmpty()) {
+            Path baseDir = Paths.get(toLocalPath(blogpostcoverLocation));
+            Path dirPath = baseDir.resolve(String.valueOf(post.getUser().getId())).resolve(String.valueOf(post.getId()));
+            try {
+                Files.createDirectories(dirPath);
+            } catch (IOException e) {
+                logger.error("无法创建目录: {}", dirPath, e);
+                return new ApiResponse<>(500, "封面上传失败（无法创建目录）", false);
+            }
+            String rawName = cover.getOriginalFilename();
+            String safeName = sanitizeFilename(rawName);
+            if (safeName.isEmpty()) safeName = String.valueOf(System.currentTimeMillis());
+            String fileName = System.currentTimeMillis() + "_" + safeName;
+            Path destPath = dirPath.resolve(fileName).normalize();
+            try {
+                Path allowed = dirPath.toAbsolutePath().normalize();
+                if (!destPath.startsWith(allowed)) {
+                    logger.warn("尝试写入不允许的位置: {} (allowed: {})", destPath, allowed);
+                    return new ApiResponse<>(400, "非法的文件路径", false);
+                }
+                File destFile = destPath.toFile();
+                cover.transferTo(destFile);
+                String url = "/sources/blogpostcover/" + post.getUser().getId() + "/" + post.getId() + "/" + fileName;
+                post.setCoverImageUrl(url);
+            } catch (IOException e) {
+                logger.error("封面上传异常", e);
+                return new ApiResponse<>(500, "封面上传失败", false);
+            }
+        }
+        blogPostRepository.save(post);
+        return new ApiResponse<>(200, "更新成功", true);
+    }
+
+    private String toLocalPath(String configured) {
+        if (configured == null) return "";
+        String v = configured;
+        if (v.startsWith("file:")) v = v.substring(5);
+        // Normalize slashes; keep as-is for Windows, ensure trailing separator
+        if (!v.endsWith(File.separator) && !v.endsWith("/")) {
+            v = v + File.separator;
+        }
+        return v.replace('/', File.separatorChar);
+    }
+
+    private String sanitizeFilename(String raw) {
+        if (raw == null) return "";
+        // Remove any path segments by taking substring after last slash/backslash
+        String name = raw;
+        int idx = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
+        if (idx >= 0 && idx + 1 < name.length()) name = name.substring(idx + 1);
+        // Remove any parent traversal
+        name = name.replace("..", "");
+        // Replace any character not in [a-zA-Z0-9._-] with underscore
+        name = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        // limit length
+        if (name.length() > 200) name = name.substring(name.length() - 200);
+        return name;
     }
 
     private long safeLong(Long v) {
@@ -268,4 +412,5 @@ public class BlogPostServiceImpl implements BlogPostService {
         return v == null ? 0 : v;
     }
 
+    // 省略其他已存在方法的实现（保持不变）
 }
