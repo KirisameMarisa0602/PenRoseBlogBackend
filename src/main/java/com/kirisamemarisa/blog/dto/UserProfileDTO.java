@@ -1,7 +1,11 @@
 package com.kirisamemarisa.blog.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class UserProfileDTO {
     private Long id;
+
+    @NotBlank(message = "昵称不能为空")
     private String nickname;
     private String avatarUrl;
     private String backgroundUrl;
@@ -22,4 +26,3 @@ public class UserProfileDTO {
     public String getGender() { return gender; }
     public void setGender(String gender) { this.gender = gender; }
 }
-

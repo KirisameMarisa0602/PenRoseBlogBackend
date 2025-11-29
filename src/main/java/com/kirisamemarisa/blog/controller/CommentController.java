@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.CommentCreateDTO;
 import com.kirisamemarisa.blog.dto.CommentDTO;
@@ -12,6 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/comment")
 public class CommentController {
+    private static final Logger logger = LoggerFactory.getLogger(CommentController.class);
     @Autowired
     private CommentService commentService;
 
@@ -22,9 +25,9 @@ public class CommentController {
 
     @GetMapping("/list/{blogPostId}")
     public ApiResponse<PageResult<CommentDTO>> listComments(@PathVariable Long blogPostId,
-                                                           @RequestParam(defaultValue = "0") int page,
-                                                           @RequestParam(defaultValue = "10") int size,
-                                                           @RequestParam(required = false) Long currentUserId) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long currentUserId) {
         PageResult<CommentDTO> result = commentService.pageComments(blogPostId, page, size, currentUserId);
         return new ApiResponse<>(200, "获取成功", result);
     }

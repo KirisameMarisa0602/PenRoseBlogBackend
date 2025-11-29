@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.PrivateMessageDTO;
 import com.kirisamemarisa.blog.events.MessageEventPublisher;
@@ -21,22 +23,25 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/messages")
 public class PrivateMessageStreamController {
+    private static final Logger logger = LoggerFactory.getLogger(PrivateMessageStreamController.class);
 
     private final UserRepository userRepository;
     private final PrivateMessageService privateMessageService;
     private final MessageEventPublisher publisher;
 
     public PrivateMessageStreamController(UserRepository userRepository,
-                                          PrivateMessageService privateMessageService,
-                                          MessageEventPublisher publisher) {
+            PrivateMessageService privateMessageService,
+            MessageEventPublisher publisher) {
         this.userRepository = userRepository;
         this.privateMessageService = privateMessageService;
         this.publisher = publisher;
     }
 
     private User resolveCurrent(UserDetails principal, Long headerUserId) {
-        if (principal != null) return userRepository.findByUsername(principal.getUsername());
-        if (headerUserId != null) return userRepository.findById(headerUserId).orElse(null);
+        if (principal != null)
+            return userRepository.findByUsername(principal.getUsername());
+        if (headerUserId != null)
+            return userRepository.findById(headerUserId).orElse(null);
         return null;
     }
 
@@ -54,8 +59,8 @@ public class PrivateMessageStreamController {
 
     @GetMapping("/stream/{otherId}")
     public SseEmitter stream(@PathVariable Long otherId,
-                             @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                             @AuthenticationPrincipal UserDetails principal) {
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrent(principal, headerUserId);
         if (me == null) {
             // 返回一个立即结束的 emitter（前端识别失败回退轮询）
@@ -63,7 +68,8 @@ public class PrivateMessageStreamController {
             try {
                 failed.send(SseEmitter.event().name("error")
                         .data(new ApiResponse<>(401, "未认证", null)));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             failed.complete();
             return failed;
         }
@@ -73,7 +79,8 @@ public class PrivateMessageStreamController {
             try {
                 failed.send(SseEmitter.event().name("error")
                         .data(new ApiResponse<>(404, "用户不存在", null)));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             failed.complete();
             return failed;
         }

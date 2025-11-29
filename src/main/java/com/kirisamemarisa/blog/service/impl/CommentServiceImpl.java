@@ -1,5 +1,8 @@
 package com.kirisamemarisa.blog.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.CommentCreateDTO;
 import com.kirisamemarisa.blog.dto.CommentDTO;
@@ -25,6 +28,7 @@ import java.util.Optional;
 
 @Service
 public class CommentServiceImpl implements CommentService {
+    private static final Logger logger = LoggerFactory.getLogger(CommentServiceImpl.class);
     @Autowired
     private CommentRepository commentRepository;
     @Autowired
@@ -41,7 +45,8 @@ public class CommentServiceImpl implements CommentService {
     @Override
     @Transactional
     public ApiResponse<Long> addComment(CommentCreateDTO dto) {
-        if (dto == null || dto.getBlogPostId() == null || dto.getUserId() == null || dto.getContent() == null || dto.getContent().trim().isEmpty()) {
+        if (dto == null || dto.getBlogPostId() == null || dto.getUserId() == null || dto.getContent() == null
+                || dto.getContent().trim().isEmpty()) {
             return new ApiResponse<>(400, "参数不完整", null);
         }
         Optional<BlogPost> blogPostOpt = blogPostRepository.findById(dto.getBlogPostId());
@@ -77,7 +82,8 @@ public class CommentServiceImpl implements CommentService {
         return comments.stream().map(comment -> {
             CommentDTO dto = commentMapper.toDTO(comment);
             if (currentUserId != null) {
-                dto.setLikedByCurrentUser(commentLikeRepository.findByCommentIdAndUserId(comment.getId(), currentUserId).isPresent());
+                dto.setLikedByCurrentUser(
+                        commentLikeRepository.findByCommentIdAndUserId(comment.getId(), currentUserId).isPresent());
             } else {
                 dto.setLikedByCurrentUser(false);
             }
@@ -92,7 +98,9 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     public PageResult<CommentDTO> pageComments(Long blogPostId, int page, int size, Long currentUserId) {
-        org.springframework.data.domain.Page<Comment> commentPage = commentRepository.findByBlogPostIdOrderByCreatedAtDesc(blogPostId, org.springframework.data.domain.PageRequest.of(page, size));
+        org.springframework.data.domain.Page<Comment> commentPage = commentRepository
+                .findByBlogPostIdOrderByCreatedAtDesc(blogPostId,
+                        org.springframework.data.domain.PageRequest.of(page, size));
         List<Comment> comments = commentPage.getContent();
         List<Long> userIds = comments.stream()
                 .map(comment -> comment.getUser().getId())
@@ -106,7 +114,8 @@ public class CommentServiceImpl implements CommentService {
         List<CommentDTO> dtoList = comments.stream().map(comment -> {
             CommentDTO dto = commentMapper.toDTO(comment);
             if (currentUserId != null) {
-                dto.setLikedByCurrentUser(commentLikeRepository.findByCommentIdAndUserId(comment.getId(), currentUserId).isPresent());
+                dto.setLikedByCurrentUser(
+                        commentLikeRepository.findByCommentIdAndUserId(comment.getId(), currentUserId).isPresent());
             } else {
                 dto.setLikedByCurrentUser(false);
             }
@@ -144,7 +153,8 @@ public class CommentServiceImpl implements CommentService {
     public ApiResponse<Boolean> toggleLike(Long commentId, Long userId) {
         Optional<CommentLike> likeOpt = commentLikeRepository.findByCommentIdAndUserId(commentId, userId);
         Optional<Comment> commentOpt = commentRepository.findById(commentId);
-        if (commentOpt.isEmpty()) return new ApiResponse<>(404, "评论不存在", false);
+        if (commentOpt.isEmpty())
+            return new ApiResponse<>(404, "评论不存在", false);
         Comment comment = commentOpt.get();
         if (likeOpt.isPresent()) {
             commentLikeRepository.delete(likeOpt.get());

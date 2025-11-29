@@ -1,10 +1,14 @@
 package com.kirisamemarisa.blog.model;
-import jakarta.persistence.*;
-import java .time.Instant;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import jakarta.persistence.*;
+import java.time.Instant;
 
 @Entity
-@Table(name = "follows", uniqueConstraints = { @UniqueConstraint(columnNames = {"follower_id", "followee_id"}) }) public class Follow {
+@Table(name = "follows", uniqueConstraints = { @UniqueConstraint(columnNames = { "follower_id", "followee_id" }) })
+public class Follow {
+    private static final Logger logger = LoggerFactory.getLogger(Follow.class);
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

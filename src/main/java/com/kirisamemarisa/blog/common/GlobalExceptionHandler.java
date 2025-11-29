@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -10,16 +12,17 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     // 参数校验异常统一处理
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ApiResponse<Void> handleValidationException(MethodArgumentNotValidException ex) {
         List<String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(FieldError::getDefaultMessage)
+                .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.toList());
-        // 只返回第一个错误信息，也可以拼接所有错误
-        String msg = errors.isEmpty() ? "参数校验失败" : errors.get(0);
+        String msg = errors.isEmpty() ? "参数校验失败" : String.join(", ", errors);
         return new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), msg, null);
     }
 
@@ -32,7 +35,7 @@ public class GlobalExceptionHandler {
     // 未知异常统一处理
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception ex) {
-        // 生产环境可隐藏详细信息
+        logger.error("服务器内部错误", ex);
         return new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(), "服务器内部错误", null);
     }
 }

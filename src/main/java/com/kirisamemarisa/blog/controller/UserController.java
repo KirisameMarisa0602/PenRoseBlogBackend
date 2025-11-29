@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.UserLoginDTO;
 import com.kirisamemarisa.blog.dto.UserRegisterDTO;
@@ -9,20 +11,20 @@ import com.kirisamemarisa.blog.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/user")
 public class UserController {
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
     @Autowired
     private UserService userService;
 
-    // 注册接口
+    // 注册接口，返回新用户ID
     @PostMapping("/register")
-    public ApiResponse<Void> register(@RequestBody @Valid UserRegisterDTO userRegisterDTO) {
-        userService.register(userRegisterDTO);
-        return new ApiResponse<>(200, "注册成功", null);
+    public ApiResponse<Long> register(@RequestBody @Valid UserRegisterDTO userRegisterDTO) {
+        Long userId = userService.registerAndReturnId(userRegisterDTO);
+        return new ApiResponse<>(200, "注册成功", userId);
     }
 
     // 登录接口
@@ -45,14 +47,44 @@ public class UserController {
     // 更新用户个人信息
     @PutMapping("/profile/{userId}")
     public ApiResponse<Void> updateProfile(@PathVariable Long userId,
-                                           @RequestBody UserProfileDTO userProfileDTO,
-                                           @AuthenticationPrincipal UserDetails principal) {
-        if (principal == null || !principal.getUsername().equals(userService.getUsernameById(userId))) {
+            @RequestBody @Valid UserProfileDTO userProfileDTO,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String token = (authHeader != null && authHeader.startsWith("Bearer ")) ? authHeader.substring(7) : authHeader;
+        Long currentUserId = com.kirisamemarisa.blog.common.JwtUtil.getUserIdFromToken(token);
+        if (currentUserId == null || !currentUserId.equals(userId)) {
             return new ApiResponse<>(403, "无权修改他人资料", null);
         }
         boolean ok = userService.updateUserProfile(userId, userProfileDTO);
         return ok ? new ApiResponse<>(200, "更新成功", null)
                 : new ApiResponse<>(400, "更新失败", null);
+    }
+
+    // 上传用户头像
+    @PostMapping("/profile/{userId}/avatar")
+    public ApiResponse<String> uploadAvatar(@PathVariable Long userId,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String token = (authHeader != null && authHeader.startsWith("Bearer ")) ? authHeader.substring(7) : authHeader;
+        Long currentUserId = com.kirisamemarisa.blog.common.JwtUtil.getUserIdFromToken(token);
+        if (currentUserId == null || !currentUserId.equals(userId)) {
+            return new ApiResponse<>(403, "无权修改他人资料", null);
+        }
+        String url = userService.uploadAvatar(userId, file);
+        return new ApiResponse<>(200, "上传成功", url);
+    }
+
+    // 上传用户背景
+    @PostMapping("/profile/{userId}/background")
+    public ApiResponse<String> uploadBackground(@PathVariable Long userId,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String token = (authHeader != null && authHeader.startsWith("Bearer ")) ? authHeader.substring(7) : authHeader;
+        Long currentUserId = com.kirisamemarisa.blog.common.JwtUtil.getUserIdFromToken(token);
+        if (currentUserId == null || !currentUserId.equals(userId)) {
+            return new ApiResponse<>(403, "无权修改他人资料", null);
+        }
+        String url = userService.uploadBackground(userId, file);
+        return new ApiResponse<>(200, "上传成功", url);
     }
 
 }

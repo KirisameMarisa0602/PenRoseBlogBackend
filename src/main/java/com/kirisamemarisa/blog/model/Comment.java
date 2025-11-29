@@ -1,11 +1,14 @@
 package com.kirisamemarisa.blog.model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "comment")
 public class Comment {
+    private static final Logger logger = LoggerFactory.getLogger(Comment.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,14 +37,43 @@ public class Comment {
         createdAt = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public BlogPost getBlogPost() { return blogPost; }
-    public void setBlogPost(BlogPost blogPost) { this.blogPost = blogPost; }
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-    public Long getLikeCount() { return likeCount; }
-    public void setLikeCount(Long likeCount) { this.likeCount = likeCount; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public Long getId() {
+        return id;
+    }
+
+    public BlogPost getBlogPost() {
+        return blogPost;
+    }
+
+    public void setBlogPost(BlogPost blogPost) {
+        this.blogPost = blogPost;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public Long getLikeCount() {
+        return likeCount;
+    }
+
+    public void setLikeCount(Long likeCount) {
+        this.likeCount = likeCount;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

@@ -1,5 +1,8 @@
 package com.kirisamemarisa.blog.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.kirisamemarisa.blog.model.User;
 import com.kirisamemarisa.blog.model.UserProfile;
 import com.kirisamemarisa.blog.repository.UserRepository;
@@ -10,6 +13,7 @@ import java.util.List;
 
 @Service
 public class UserSearchServiceImpl implements UserSearchService {
+    private static final Logger logger = LoggerFactory.getLogger(UserSearchServiceImpl.class);
     private final UserRepository userRepository;
 
     public UserSearchServiceImpl(UserRepository userRepository) {

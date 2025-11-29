@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.*;
 import com.kirisamemarisa.blog.service.BlogPostService;
@@ -10,6 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/blogpost")
 public class BlogPostController {
+    private static final Logger logger = LoggerFactory.getLogger(BlogPostController.class);
 
     private final BlogPostService blogPostService;
 
@@ -24,7 +27,7 @@ public class BlogPostController {
 
     @GetMapping("/{id}")
     public ApiResponse<BlogPostDTO> get(@PathVariable Long id,
-                                        @RequestParam(required = false) Long currentUserId) {
+            @RequestParam(required = false) Long currentUserId) {
         BlogPostDTO dto = blogPostService.getById(id, currentUserId);
         if (dto == null) {
             return new ApiResponse<>(404, "博客不存在", null);
@@ -34,15 +37,15 @@ public class BlogPostController {
 
     @GetMapping
     public ApiResponse<PageResult<BlogPostDTO>> list(@RequestParam(defaultValue = "0") int page,
-                                  @RequestParam(defaultValue = "10") int size,
-                                  @RequestParam(required = false) Long currentUserId) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long currentUserId) {
         PageResult<BlogPostDTO> result = blogPostService.pageList(page, size, currentUserId);
         return new ApiResponse<>(200, "获取成功", result);
     }
 
     @PostMapping("/{id}/like")
     public ApiResponse<Boolean> toggleLike(@PathVariable Long id,
-                                           @RequestParam Long userId) {
+            @RequestParam Long userId) {
         return blogPostService.toggleLike(id, userId);
     }
 
@@ -53,16 +56,16 @@ public class BlogPostController {
 
     @GetMapping("/{id}/comments")
     public ApiResponse<PageResult<CommentDTO>> comments(@PathVariable Long id,
-                                     @RequestParam(defaultValue = "0") int page,
-                                     @RequestParam(defaultValue = "10") int size,
-                                     @RequestParam(required = false) Long currentUserId) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) Long currentUserId) {
         PageResult<CommentDTO> result = blogPostService.pageComments(id, page, size, currentUserId);
         return new ApiResponse<>(200, "获取成功", result);
     }
 
     @PostMapping("/comment/{id}/like")
     public ApiResponse<Boolean> toggleCommentLike(@PathVariable Long id,
-                                                  @RequestParam Long userId) {
+            @RequestParam Long userId) {
         return blogPostService.toggleCommentLike(id, userId);
     }
 

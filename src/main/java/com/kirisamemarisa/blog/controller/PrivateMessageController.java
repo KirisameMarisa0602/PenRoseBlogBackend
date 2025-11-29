@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.PageResult;
 import com.kirisamemarisa.blog.dto.PrivateMessageDTO;
@@ -22,22 +24,25 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/messages")
 public class PrivateMessageController {
+    private static final Logger logger = LoggerFactory.getLogger(PrivateMessageController.class);
 
     private final UserRepository userRepository;
     private final PrivateMessageService privateMessageService;
     private final MessageEventPublisher publisher;
 
     public PrivateMessageController(UserRepository userRepository,
-                                    PrivateMessageService privateMessageService,
-                                    MessageEventPublisher publisher) {
+            PrivateMessageService privateMessageService,
+            MessageEventPublisher publisher) {
         this.userRepository = userRepository;
         this.privateMessageService = privateMessageService;
         this.publisher = publisher;
     }
 
     private User resolveCurrent(UserDetails principal, Long headerUserId) {
-        if (principal != null) return userRepository.findByUsername(principal.getUsername());
-        if (headerUserId != null) return userRepository.findById(headerUserId).orElse(null);
+        if (principal != null)
+            return userRepository.findByUsername(principal.getUsername());
+        if (headerUserId != null)
+            return userRepository.findById(headerUserId).orElse(null);
         return null;
     }
 
@@ -72,26 +77,30 @@ public class PrivateMessageController {
 
     @GetMapping("/conversation/{otherId}")
     public ApiResponse<PageResult<PrivateMessageDTO>> conversation(@PathVariable Long otherId,
-                                                             @RequestParam(defaultValue = "0") int page,
-                                                             @RequestParam(defaultValue = "20") int size,
-                                                             @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                                                             @AuthenticationPrincipal UserDetails principal) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrent(principal, headerUserId);
-        if (me == null) return new ApiResponse<>(401, "未认证", null);
+        if (me == null)
+            return new ApiResponse<>(401, "未认证", null);
         User other = userRepository.findById(otherId).orElse(null);
-        if (other == null) return new ApiResponse<>(404, "用户不存在", null);
+        if (other == null)
+            return new ApiResponse<>(404, "用户不存在", null);
         return buildConversation(me, other, page, size);
     }
 
     @PostMapping("/text/{otherId}")
     public ApiResponse<PrivateMessageDTO> sendText(@PathVariable Long otherId,
-                                                   @RequestBody PrivateMessageDTO body,
-                                                   @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                                                   @AuthenticationPrincipal UserDetails principal) {
+            @RequestBody PrivateMessageDTO body,
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrent(principal, headerUserId);
-        if (me == null) return new ApiResponse<>(401, "未认证", null);
+        if (me == null)
+            return new ApiResponse<>(401, "未认证", null);
         User other = userRepository.findById(otherId).orElse(null);
-        if (other == null) return new ApiResponse<>(404, "用户不存在", null);
+        if (other == null)
+            return new ApiResponse<>(404, "用户不存在", null);
         PrivateMessage msg = privateMessageService.sendText(me, other, body.getText());
         PrivateMessageDTO dto = toDTO(msg);
         // 推送最新会话
@@ -102,14 +111,17 @@ public class PrivateMessageController {
 
     @PostMapping("/media/{otherId}")
     public ApiResponse<PrivateMessageDTO> sendMedia(@PathVariable Long otherId,
-                                                    @RequestBody PrivateMessageDTO body,
-                                                    @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                                                    @AuthenticationPrincipal UserDetails principal) {
+            @RequestBody PrivateMessageDTO body,
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrent(principal, headerUserId);
-        if (me == null) return new ApiResponse<>(401, "未认证", null);
+        if (me == null)
+            return new ApiResponse<>(401, "未认证", null);
         User other = userRepository.findById(otherId).orElse(null);
-        if (other == null) return new ApiResponse<>(404, "用户不存在", null);
-        PrivateMessage msg = privateMessageService.sendMedia(me, other, body.getType(), body.getMediaUrl(), body.getText());
+        if (other == null)
+            return new ApiResponse<>(404, "用户不存在", null);
+        PrivateMessage msg = privateMessageService.sendMedia(me, other, body.getType(), body.getMediaUrl(),
+                body.getText());
         PrivateMessageDTO dto = toDTO(msg);
         publisher.broadcast(me.getId(), other.getId(),
                 privateMessageService.conversation(me, other).stream().map(this::toDTO).collect(Collectors.toList()));

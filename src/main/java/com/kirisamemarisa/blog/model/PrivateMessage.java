@@ -1,9 +1,15 @@
 package com.kirisamemarisa.blog.model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jakarta.persistence.*;
 import java.time.Instant;
 
-@Entity @Table(name = "private_messages") public class PrivateMessage {
+@Entity
+@Table(name = "private_messages")
+public class PrivateMessage {
+    private static final Logger logger = LoggerFactory.getLogger(PrivateMessage.class);
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -33,7 +39,9 @@ import java.time.Instant;
         this.createdAt = Instant.now();
     }
 
-    public enum MessageType {TEXT, IMAGE, VIDEO}
+    public enum MessageType {
+        TEXT, IMAGE, VIDEO
+    }
 
     public Long getId() {
         return id;

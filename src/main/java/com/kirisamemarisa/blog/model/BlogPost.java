@@ -1,5 +1,8 @@
 package com.kirisamemarisa.blog.model;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -8,6 +11,7 @@ import java.util.List;
 @Entity
 @Table(name = "blog_post")
 public class BlogPost {
+    private static final Logger logger = LoggerFactory.getLogger(BlogPost.class);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -69,31 +73,111 @@ public class BlogPost {
         updatedAt = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public User getUser() { return user; }
-    public void setUser(User user) { this.user = user; }
-    public String getCoverImageUrl() { return coverImageUrl; }
-    public void setCoverImageUrl(String coverImageUrl) { this.coverImageUrl = coverImageUrl; }
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-    public String getDirectory() { return directory; }
-    public void setDirectory(String directory) { this.directory = directory; }
-    public Long getLikeCount() { return likeCount; }
-    public void setLikeCount(Long likeCount) { this.likeCount = likeCount; }
-    public Long getCommentCount() { return commentCount; }
-    public void setCommentCount(Long commentCount) { this.commentCount = commentCount; }
-    public Long getShareCount() { return shareCount; }
-    public void setShareCount(Long shareCount) { this.shareCount = shareCount; }
-    public Integer getRepostCount() { return repostCount; }
-    public void setRepostCount(Integer repostCount) { this.repostCount = repostCount; }
-    public boolean isRepost() { return repost; }
-    public void setRepost(boolean repost) { this.repost = repost; }
-    public BlogPost getOriginalPost() { return originalPost; }
-    public void setOriginalPost(BlogPost originalPost) { this.originalPost = originalPost; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public List<Comment> getComments() { return comments; }
-    public void setComments(List<Comment> comments) { this.comments = comments; }
+    public Long getId() {
+        return id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public String getCoverImageUrl() {
+        return coverImageUrl;
+    }
+
+    public void setCoverImageUrl(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public String getDirectory() {
+        return directory;
+    }
+
+    public void setDirectory(String directory) {
+        this.directory = directory;
+    }
+
+    public Long getLikeCount() {
+        return likeCount;
+    }
+
+    public void setLikeCount(Long likeCount) {
+        this.likeCount = likeCount;
+    }
+
+    public Long getCommentCount() {
+        return commentCount;
+    }
+
+    public void setCommentCount(Long commentCount) {
+        this.commentCount = commentCount;
+    }
+
+    public Long getShareCount() {
+        return shareCount;
+    }
+
+    public void setShareCount(Long shareCount) {
+        this.shareCount = shareCount;
+    }
+
+    public Integer getRepostCount() {
+        return repostCount;
+    }
+
+    public void setRepostCount(Integer repostCount) {
+        this.repostCount = repostCount;
+    }
+
+    public boolean isRepost() {
+        return repost;
+    }
+
+    public void setRepost(boolean repost) {
+        this.repost = repost;
+    }
+
+    public BlogPost getOriginalPost() {
+        return originalPost;
+    }
+
+    public void setOriginalPost(BlogPost originalPost) {
+        this.originalPost = originalPost;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public List<Comment> getComments() {
+        return comments;
+    }
+
+    public void setComments(List<Comment> comments) {
+        this.comments = comments;
+    }
 }

@@ -1,5 +1,8 @@
 package com.kirisamemarisa.blog.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.*;
 import com.kirisamemarisa.blog.model.*;
@@ -16,7 +19,9 @@ import java.util.List;
 import com.kirisamemarisa.blog.dto.PageResult;
 import org.springframework.data.domain.Page;
 
-@Service public class BlogPostServiceImpl implements BlogPostService {
+@Service
+public class BlogPostServiceImpl implements BlogPostService {
+    private static final Logger logger = LoggerFactory.getLogger(BlogPostServiceImpl.class);
     private final BlogPostRepository blogPostRepository;
     private final UserRepository userRepository;
     private final CommentRepository commentRepository;
@@ -27,13 +32,13 @@ import org.springframework.data.domain.Page;
     private final CommentService commentService; // 新增依赖
 
     public BlogPostServiceImpl(BlogPostRepository blogPostRepository,
-                               UserRepository userRepository,
-                               CommentRepository commentRepository,
-                               BlogPostLikeRepository blogPostLikeRepository,
-                               CommentLikeRepository commentLikeRepository,
-                               UserProfileRepository userProfileRepository,
-                               BlogPostMapper blogPostMapper,
-                               CommentService commentService) { // 注入 CommentService
+            UserRepository userRepository,
+            CommentRepository commentRepository,
+            BlogPostLikeRepository blogPostLikeRepository,
+            CommentLikeRepository commentLikeRepository,
+            UserProfileRepository userProfileRepository,
+            BlogPostMapper blogPostMapper,
+            CommentService commentService) { // 注入 CommentService
         this.blogPostRepository = blogPostRepository;
         this.userRepository = userRepository;
         this.commentRepository = commentRepository;
@@ -47,7 +52,8 @@ import org.springframework.data.domain.Page;
     @Override
     @Transactional
     public ApiResponse<Long> create(BlogPostCreateDTO dto) {
-        if (dto == null) return new ApiResponse<>(400, "请求体不能为空", null);
+        if (dto == null)
+            return new ApiResponse<>(400, "请求体不能为空", null);
         if (dto.getTitle() == null || dto.getTitle().trim().isEmpty())
             return new ApiResponse<>(400, "标题不能为空", null);
         if (dto.getContent() == null || dto.getContent().trim().isEmpty())
@@ -84,24 +90,29 @@ import org.springframework.data.domain.Page;
     @Override
     @Transactional
     public ApiResponse<Boolean> update(Long id, BlogPostUpdateDTO dto) {
-        if (dto == null) return new ApiResponse<>(400, "请求体不能为空", false);
+        if (dto == null)
+            return new ApiResponse<>(400, "请求体不能为空", false);
         Optional<BlogPost> opt = blogPostRepository.findById(id);
-        if (opt.isEmpty()) return new ApiResponse<>(404, "博客不存在", false);
+        if (opt.isEmpty())
+            return new ApiResponse<>(404, "博客不存在", false);
         BlogPost post = opt.get();
         // 支持cover字段兼容
-        if (dto.getCoverImageUrl() != null) post.setCoverImageUrl(dto.getCoverImageUrl());
+        if (dto.getCoverImageUrl() != null)
+            post.setCoverImageUrl(dto.getCoverImageUrl());
         // 兼容前端传cover字段
         try {
             java.lang.reflect.Field coverField = dto.getClass().getDeclaredField("cover");
             coverField.setAccessible(true);
             Object coverValue = coverField.get(dto);
-            if (coverValue instanceof String && !((String)coverValue).isEmpty()) {
-                post.setCoverImageUrl((String)coverValue);
+            if (coverValue instanceof String && !((String) coverValue).isEmpty()) {
+                post.setCoverImageUrl((String) coverValue);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         if (dto.getContent() != null && !dto.getContent().trim().isEmpty())
             post.setContent(dto.getContent().trim());
-        if (dto.getDirectory() != null) post.setDirectory(dto.getDirectory());
+        if (dto.getDirectory() != null)
+            post.setDirectory(dto.getDirectory());
         // 支持后续字段扩展
         blogPostMapper.updateEntityFromDTO(dto, post);
         blogPostRepository.save(post);
@@ -114,9 +125,11 @@ import org.springframework.data.domain.Page;
         if (blogPostId == null || userId == null)
             return new ApiResponse<>(400, "参数缺失", false);
         Optional<BlogPost> postOpt = blogPostRepository.findById(blogPostId);
-        if (postOpt.isEmpty()) return new ApiResponse<>(404, "博客不存在", false);
+        if (postOpt.isEmpty())
+            return new ApiResponse<>(404, "博客不存在", false);
         Optional<User> userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty()) return new ApiResponse<>(404, "用户不存在", false);
+        if (userOpt.isEmpty())
+            return new ApiResponse<>(404, "用户不存在", false);
 
         BlogPost post = postOpt.get();
         Optional<BlogPostLike> likeOpt = blogPostLikeRepository.findByBlogPostIdAndUserId(blogPostId, userId);
@@ -154,14 +167,19 @@ import org.springframework.data.domain.Page;
     @Override
     @Transactional
     public ApiResponse<Long> repost(RepostCreateDTO dto) {
-        if (dto == null) return new ApiResponse<>(400, "请求体不能为空", null);
-        if (dto.getOriginalPostId() == null) return new ApiResponse<>(400, "原博客ID不能为空", null);
-        if (dto.getUserId() == null) return new ApiResponse<>(400, "用户ID不能为空", null);
+        if (dto == null)
+            return new ApiResponse<>(400, "请求体不能为空", null);
+        if (dto.getOriginalPostId() == null)
+            return new ApiResponse<>(400, "原博客ID不能为空", null);
+        if (dto.getUserId() == null)
+            return new ApiResponse<>(400, "用户ID不能为空", null);
 
         Optional<BlogPost> originalOpt = blogPostRepository.findById(dto.getOriginalPostId());
-        if (originalOpt.isEmpty()) return new ApiResponse<>(404, "原博客不存在", null);
+        if (originalOpt.isEmpty())
+            return new ApiResponse<>(404, "原博客不存在", null);
         Optional<User> userOpt = userRepository.findById(dto.getUserId());
-        if (userOpt.isEmpty()) return new ApiResponse<>(404, "用户不存在", null);
+        if (userOpt.isEmpty())
+            return new ApiResponse<>(404, "用户不存在", null);
 
         BlogPost original = originalOpt.get();
 
@@ -173,10 +191,10 @@ import org.springframework.data.domain.Page;
         repost.setUser(userOpt.get());
         repost.setRepost(true);
         repost.setOriginalPost(original);
-        repost.setTitle(snippet);          // 标题为原文前30字
-        repost.setContent(snippet);        // 内容只存片段（与需求“只有正文片段”一致）
-        repost.setCoverImageUrl(null);     // 转发不保留封面
-        repost.setDirectory(null);         // 不继承目录（需求未要求）
+        repost.setTitle(snippet); // 标题为原文前30字
+        repost.setContent(snippet); // 内容只存片段（与需求“只有正文片段”一致）
+        repost.setCoverImageUrl(null); // 转发不保留封面
+        repost.setDirectory(null); // 不继承目录（需求未要求）
         BlogPost saved = blogPostRepository.save(repost);
 
         // 原博客转发计数自增（安全处理 null）
@@ -185,7 +203,6 @@ import org.springframework.data.domain.Page;
 
         return new ApiResponse<>(200, "转发成功", saved.getId());
     }
-
 
     @Override
     public PageResult<BlogPostDTO> pageList(int page, int size, Long currentUserId) {
@@ -218,7 +235,8 @@ import org.springframework.data.domain.Page;
 
     @Override
     public PageResult<CommentDTO> pageComments(Long blogPostId, int page, int size, Long currentUserId) {
-        Page<Comment> commentPage = commentRepository.findByBlogPostIdOrderByCreatedAtDesc(blogPostId, PageRequest.of(page, size));
+        Page<Comment> commentPage = commentRepository.findByBlogPostIdOrderByCreatedAtDesc(blogPostId,
+                PageRequest.of(page, size));
         List<CommentDTO> dtoList = commentPage.getContent().stream().map(c -> toCommentDTO(c, currentUserId)).toList();
         return new PageResult<>(dtoList, commentPage.getTotalElements(), page, size);
     }
@@ -233,8 +251,7 @@ import org.springframework.data.domain.Page;
         dto.setLikeCount(safeLong(c.getLikeCount()));
         if (currentUserId != null) {
             dto.setLikedByCurrentUser(
-                    commentLikeRepository.findByCommentIdAndUserId(c.getId(), currentUserId).isPresent()
-            );
+                    commentLikeRepository.findByCommentIdAndUserId(c.getId(), currentUserId).isPresent());
         }
         userProfileRepository.findById(c.getUser().getId()).ifPresent(p -> {
             dto.setNickname(p.getNickname());
@@ -243,7 +260,12 @@ import org.springframework.data.domain.Page;
         return dto;
     }
 
-    private long safeLong(Long v) { return v == null ? 0L : v; }
-    private int safeInt(Integer v) { return v == null ? 0 : v; }
+    private long safeLong(Long v) {
+        return v == null ? 0L : v;
+    }
+
+    private int safeInt(Integer v) {
+        return v == null ? 0 : v;
+    }
 
 }

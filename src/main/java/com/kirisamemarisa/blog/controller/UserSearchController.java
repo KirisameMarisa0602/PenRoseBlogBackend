@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.PageResult;
 import com.kirisamemarisa.blog.dto.UserSearchDTO;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
  */
 @RestController
 public class UserSearchController {
+    private static final Logger logger = LoggerFactory.getLogger(UserSearchController.class);
 
     private final UserSearchService userSearchService;
 

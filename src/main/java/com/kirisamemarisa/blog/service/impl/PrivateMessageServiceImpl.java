@@ -1,5 +1,8 @@
 package com.kirisamemarisa.blog.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.kirisamemarisa.blog.model.PrivateMessage;
 import com.kirisamemarisa.blog.model.User;
 import com.kirisamemarisa.blog.repository.PrivateMessageRepository;
@@ -14,6 +17,7 @@ import java.util.List;
 @Service
 @Transactional
 public class PrivateMessageServiceImpl implements PrivateMessageService {
+    private static final Logger logger = LoggerFactory.getLogger(PrivateMessageServiceImpl.class);
     private final PrivateMessageRepository messageRepository;
     private final FollowService followService;
 
@@ -44,7 +48,8 @@ public class PrivateMessageServiceImpl implements PrivateMessageService {
     }
 
     @Override
-    public PrivateMessage sendMedia(User sender, User receiver, PrivateMessage.MessageType type, String mediaUrl, String caption) {
+    public PrivateMessage sendMedia(User sender, User receiver, PrivateMessage.MessageType type, String mediaUrl,
+            String caption) {
         if (!canSendMedia(sender, receiver)) {
             throw new IllegalStateException("发送媒体需互相关注或对方已回复。");
         }

@@ -1,5 +1,8 @@
 package com.kirisamemarisa.blog.service.impl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.kirisamemarisa.blog.model.Follow;
 import com.kirisamemarisa.blog.model.User;
 import com.kirisamemarisa.blog.model.UserProfile;
@@ -16,6 +19,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class FollowServiceImpl implements FollowService {
+    private static final Logger logger = LoggerFactory.getLogger(FollowServiceImpl.class);
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
 

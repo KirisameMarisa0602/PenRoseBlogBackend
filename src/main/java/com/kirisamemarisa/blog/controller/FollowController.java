@@ -1,5 +1,7 @@
 package com.kirisamemarisa.blog.controller;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.kirisamemarisa.blog.common.ApiResponse;
 import com.kirisamemarisa.blog.dto.UserSimpleDTO;
 import com.kirisamemarisa.blog.dto.PageResult;
@@ -21,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/follow")
 public class FollowController {
+    private static final Logger logger = LoggerFactory.getLogger(FollowController.class);
 
     private final UserRepository userRepository;
     private final FollowService followService;
@@ -42,8 +45,8 @@ public class FollowController {
 
     @PostMapping("/{targetId}")
     public ApiResponse<Void> follow(@PathVariable Long targetId,
-                                    @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                                    @AuthenticationPrincipal UserDetails principal) {
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrentUser(principal, headerUserId);
         if (me == null) {
             return new ApiResponse<>(401, "未认证", null);
@@ -64,8 +67,8 @@ public class FollowController {
 
     @DeleteMapping("/{targetId}")
     public ApiResponse<Void> unfollow(@PathVariable Long targetId,
-                                      @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                                      @AuthenticationPrincipal UserDetails principal) {
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrentUser(principal, headerUserId);
         if (me == null) {
             return new ApiResponse<>(401, "未认证", null);
@@ -119,8 +122,8 @@ public class FollowController {
 
     @GetMapping("/friends/{otherId}")
     public ApiResponse<Boolean> isFriends(@PathVariable Long otherId,
-                                          @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
-                                          @AuthenticationPrincipal UserDetails principal) {
+            @RequestHeader(name = "X-User-Id", required = false) Long headerUserId,
+            @AuthenticationPrincipal UserDetails principal) {
         User me = resolveCurrentUser(principal, headerUserId);
         if (me == null) {
             return new ApiResponse<>(401, "未认证", null);

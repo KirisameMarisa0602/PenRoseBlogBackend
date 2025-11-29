@@ -4,6 +4,7 @@ import com.kirisamemarisa.blog.dto.LoginResponseDTO;
 import com.kirisamemarisa.blog.dto.UserLoginDTO;
 import com.kirisamemarisa.blog.dto.UserRegisterDTO;
 import com.kirisamemarisa.blog.dto.UserProfileDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
     void register(UserRegisterDTO dto);
@@ -11,4 +12,7 @@ public interface UserService {
     UserProfileDTO getUserProfileDTO(Long userId);
     boolean updateUserProfile(Long userId, UserProfileDTO dto);
     String getUsernameById(Long userId);
+    String uploadAvatar(Long userId, MultipartFile file);
+    String uploadBackground(Long userId, MultipartFile file);
+    Long registerAndReturnId(UserRegisterDTO dto);
 }
