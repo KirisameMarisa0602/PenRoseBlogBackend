@@ -5,7 +5,9 @@
 
 package com.kirisamemarisa.blog.service.impl;
 
+import com.kirisamemarisa.blog.dto.PrivateMessageDTO;
 import com.kirisamemarisa.blog.dto.PrivateMessageViewDTO;
+import com.kirisamemarisa.blog.events.MessageEventPublisher;
 import com.kirisamemarisa.blog.mapper.PrivateMessageViewMapper;
 import com.kirisamemarisa.blog.model.PrivateMessage;
 import com.kirisamemarisa.blog.model.PrivateMessageStatus;
@@ -31,13 +33,29 @@ public class PrivateMessageManageServiceImpl implements PrivateMessageManageServ
     private final PrivateMessageRepository messageRepository;
     private final PrivateMessageStatusRepository statusRepository;
     private final PrivateMessageService privateMessageService;
+    private final MessageEventPublisher publisher;
 
     public PrivateMessageManageServiceImpl(PrivateMessageRepository messageRepository,
                                            PrivateMessageStatusRepository statusRepository,
-                                           PrivateMessageService privateMessageService) {
+                                           PrivateMessageService privateMessageService,
+                                           MessageEventPublisher publisher) {
         this.messageRepository = messageRepository;
         this.statusRepository = statusRepository;
         this.privateMessageService = privateMessageService;
+        this.publisher = publisher;
+    }
+
+    // 轻量 DTO 映射（只需基本字段，供 SSE 会话列表用）
+    private PrivateMessageDTO toDTO(PrivateMessage msg) {
+        PrivateMessageDTO dto = new PrivateMessageDTO();
+        dto.setId(msg.getId());
+        dto.setSenderId(msg.getSender() != null ? msg.getSender().getId() : null);
+        dto.setReceiverId(msg.getReceiver() != null ? msg.getReceiver().getId() : null);
+        dto.setText(msg.getText());
+        dto.setMediaUrl(msg.getMediaUrl());
+        dto.setType(msg.getType());
+        dto.setCreatedAt(msg.getCreatedAt());
+        return dto;
     }
 
     @Override
@@ -83,6 +101,20 @@ public class PrivateMessageManageServiceImpl implements PrivateMessageManageServ
                 s.setRecalled(true);
             }
             statusRepository.saveAll(allStatus);
+        }
+
+        // 新增：撤回成功后广播会话更新（双方都能即时收到）
+        try {
+            User other = Objects.equals(message.getSender().getId(), currentUser.getId())
+                    ? message.getReceiver() : message.getSender();
+            if (other != null) {
+                List<PrivateMessageDTO> conversation = privateMessageService
+                        .conversation(currentUser, other)
+                        .stream().map(this::toDTO).toList();
+                publisher.broadcast(currentUser.getId(), other.getId(), conversation);
+            }
+        } catch (Exception ignore) {
+            // 保持最小侵入：广播失败不影响主流程
         }
     }
 
