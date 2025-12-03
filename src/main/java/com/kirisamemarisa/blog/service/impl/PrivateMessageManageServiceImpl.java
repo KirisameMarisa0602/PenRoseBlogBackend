@@ -5,7 +5,9 @@
 
 package com.kirisamemarisa.blog.service.impl;
 
+import com.kirisamemarisa.blog.dto.PrivateMessageDTO;
 import com.kirisamemarisa.blog.dto.PrivateMessageViewDTO;
+import com.kirisamemarisa.blog.events.MessageEventPublisher;
 import com.kirisamemarisa.blog.mapper.PrivateMessageViewMapper;
 import com.kirisamemarisa.blog.model.PrivateMessage;
 import com.kirisamemarisa.blog.model.PrivateMessageStatus;
@@ -31,13 +33,29 @@ public class PrivateMessageManageServiceImpl implements PrivateMessageManageServ
     private final PrivateMessageRepository messageRepository;
     private final PrivateMessageStatusRepository statusRepository;
     private final PrivateMessageService privateMessageService;
+    private final MessageEventPublisher publisher;
 
     public PrivateMessageManageServiceImpl(PrivateMessageRepository messageRepository,
                                            PrivateMessageStatusRepository statusRepository,
-                                           PrivateMessageService privateMessageService) {
+                                           PrivateMessageService privateMessageService,
+                                           MessageEventPublisher publisher) {
         this.messageRepository = messageRepository;
         this.statusRepository = statusRepository;
         this.privateMessageService = privateMessageService;
+        this.publisher = publisher;
+    }
+
+    // 轻量 DTO 映射（只需基本字段，供 SSE 会话列表用）
+    private PrivateMessageDTO toDTO(PrivateMessage msg) {
+        PrivateMessageDTO dto = new PrivateMessageDTO();
+        dto.setId(msg.getId());
+        dto.setSenderId(msg.getSender() != null ? msg.getSender().getId() : null);
+        dto.setReceiverId(msg.getReceiver() != null ? msg.getReceiver().getId() : null);
+        dto.setText(msg.getText());
+        dto.setMediaUrl(msg.getMediaUrl());
+        dto.setType(msg.getType());
+        dto.setCreatedAt(msg.getCreatedAt());
+        return dto;
     }
 
     @Override
@@ -65,24 +83,52 @@ public class PrivateMessageManageServiceImpl implements PrivateMessageManageServ
 
         // 找到所有与该消息相关的状态记录（包括发送方和接收方）
         List<PrivateMessageStatus> allStatus = statusRepository.findByMessage(message);
-        if (allStatus.isEmpty()) {
-            // 如之前未建立状态记录，则针对 sender & receiver 补一条
-            List<User> users = new ArrayList<>();
-            if (message.getSender() != null) users.add(message.getSender());
-            if (message.getReceiver() != null) users.add(message.getReceiver());
-            for (User u : users) {
-                PrivateMessageStatus s = new PrivateMessageStatus();
-                s.setMessage(message);
-                s.setUser(u);
-                s.setRecalled(true);
-                s.setDeletedForUser(false);
-                statusRepository.save(s);
-            }
-        } else {
+
+        // 统一：确保 sender/receiver 都有一条状态记录
+        User sender = message.getSender();
+        User receiver = message.getReceiver();
+
+        // 现有记录先全部标记撤回
+        if (!allStatus.isEmpty()) {
             for (PrivateMessageStatus s : allStatus) {
                 s.setRecalled(true);
             }
             statusRepository.saveAll(allStatus);
+        }
+
+        // 检查并为缺失的一方补记录（关键修复：即使已有部分记录，也要补齐另一方）
+        boolean hasSender = allStatus.stream().anyMatch(s -> s.getUser() != null && s.getUser().getId().equals(sender != null ? sender.getId() : null));
+        boolean hasReceiver = allStatus.stream().anyMatch(s -> s.getUser() != null && s.getUser().getId().equals(receiver != null ? receiver.getId() : null));
+
+        if (sender != null && !hasSender) {
+            PrivateMessageStatus s = new PrivateMessageStatus();
+            s.setMessage(message);
+            s.setUser(sender);
+            s.setRecalled(true);
+            s.setDeletedForUser(false);
+            statusRepository.save(s);
+        }
+        if (receiver != null && !hasReceiver) {
+            PrivateMessageStatus s = new PrivateMessageStatus();
+            s.setMessage(message);
+            s.setUser(receiver);
+            s.setRecalled(true);
+            s.setDeletedForUser(false);
+            statusRepository.save(s);
+        }
+
+        // 新增：撤回成功后广播会话更新（双方都能即时收到）
+        try {
+            User other = Objects.equals(message.getSender().getId(), currentUser.getId())
+                    ? message.getReceiver() : message.getSender();
+            if (other != null) {
+                List<PrivateMessageDTO> conversation = privateMessageService
+                        .conversation(currentUser, other)
+                        .stream().map(this::toDTO).toList();
+                publisher.broadcast(currentUser.getId(), other.getId(), conversation);
+            }
+        } catch (Exception ignore) {
+            // 保持最小侵入：广播失败不影响主流程
         }
     }
 
