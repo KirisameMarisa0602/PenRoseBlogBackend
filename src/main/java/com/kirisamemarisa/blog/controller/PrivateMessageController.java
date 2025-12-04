@@ -324,35 +324,40 @@ public class PrivateMessageController {
         User other = userRepository.findById(otherId).orElse(null);
         if (other == null) return new ApiResponse<>(404, "用户不存在", null);
 
-        PrivateMessage msg = privateMessageService.sendText(me, other, body.getText());
-        PrivateMessageDTO dto = toDTOSingle(msg);
+        try {
+            PrivateMessage msg = privateMessageService.sendText(me, other, body.getText());
+            PrivateMessageDTO dto = toDTOSingle(msg);
 
-        // 通知（系统级）
-        sendPmNotification(msg);
+            // 通知（系统级）
+            sendPmNotification(msg);
 
-        // 会话最新一页，用于 SSE 推送
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
+            // 会话最新一页，用于 SSE 推送
+            Pageable pageable = PageRequest.of(0, 20);
+            Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
 
-        Set<Long> userIds = new HashSet<>();
-        pmPage.getContent().forEach(m -> {
-            if (m.getSender() != null) userIds.add(m.getSender().getId());
-            if (m.getReceiver() != null) userIds.add(m.getReceiver().getId());
-        });
-        Map<Long, UserProfile> profileMap = new HashMap<>();
-        if (!userIds.isEmpty()) {
-            List<UserProfile> profiles = userProfileRepository.findAllById(userIds);
-            profiles.forEach(p -> profileMap.put(p.getId(), p));
+            Set<Long> userIds = new HashSet<>();
+            pmPage.getContent().forEach(m -> {
+                if (m.getSender() != null) userIds.add(m.getSender().getId());
+                if (m.getReceiver() != null) userIds.add(m.getReceiver().getId());
+            });
+            Map<Long, UserProfile> profileMap = new HashMap<>();
+            if (!userIds.isEmpty()) {
+                List<UserProfile> profiles = userProfileRepository.findAllById(userIds);
+                profiles.forEach(p -> profileMap.put(p.getId(), p));
+            }
+            List<PrivateMessageDTO> dtoList = pmPage.getContent().stream()
+                    .map(m -> toDTO(m, profileMap))
+                    .collect(Collectors.toList());
+            Collections.reverse(dtoList);
+
+            // SSE 广播给当前会话双方
+            publisher.broadcast(me.getId(), other.getId(), dtoList);
+
+            return new ApiResponse<>(200, "发送成功", dto);
+        } catch (IllegalStateException ex) {
+            // 例如：被拉黑 / 不允许发送等业务拒绝
+            return new ApiResponse<>(400, ex.getMessage(), null);
         }
-        List<PrivateMessageDTO> dtoList = pmPage.getContent().stream()
-                .map(m -> toDTO(m, profileMap))
-                .collect(Collectors.toList());
-        Collections.reverse(dtoList);
-
-        // SSE 广播给当前会话双方
-        publisher.broadcast(me.getId(), other.getId(), dtoList);
-
-        return new ApiResponse<>(200, "发送成功", dto);
     }
 
     @PostMapping("/media/{otherId}")
@@ -365,33 +370,37 @@ public class PrivateMessageController {
         User other = userRepository.findById(otherId).orElse(null);
         if (other == null) return new ApiResponse<>(404, "用户不存在", null);
 
-        PrivateMessage msg = privateMessageService.sendMedia(me, other, body.getType(), body.getMediaUrl(), body.getText());
-        PrivateMessageDTO dto = toDTOSingle(msg);
+        try {
+            PrivateMessage msg = privateMessageService.sendMedia(me, other, body.getType(), body.getMediaUrl(), body.getText());
+            PrivateMessageDTO dto = toDTOSingle(msg);
 
-        sendPmNotification(msg);
+            sendPmNotification(msg);
 
-        // 同样推送最新一页
-        Pageable pageable = PageRequest.of(0, 20);
-        Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
+            // 同样推送最新一页
+            Pageable pageable = PageRequest.of(0, 20);
+            Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
 
-        Set<Long> userIds = new HashSet<>();
-        pmPage.getContent().forEach(m -> {
-            if (m.getSender() != null) userIds.add(m.getSender().getId());
-            if (m.getReceiver() != null) userIds.add(m.getReceiver().getId());
-        });
-        Map<Long, UserProfile> profileMap = new HashMap<>();
-        if (!userIds.isEmpty()) {
-            List<UserProfile> profiles = userProfileRepository.findAllById(userIds);
-            profiles.forEach(p -> profileMap.put(p.getId(), p));
+            Set<Long> userIds = new HashSet<>();
+            pmPage.getContent().forEach(m -> {
+                if (m.getSender() != null) userIds.add(m.getSender().getId());
+                if (m.getReceiver() != null) userIds.add(m.getReceiver().getId());
+            });
+            Map<Long, UserProfile> profileMap = new HashMap<>();
+            if (!userIds.isEmpty()) {
+                List<UserProfile> profiles = userProfileRepository.findAllById(userIds);
+                profiles.forEach(p -> profileMap.put(p.getId(), p));
+            }
+            List<PrivateMessageDTO> dtoList = pmPage.getContent().stream()
+                    .map(m -> toDTO(m, profileMap))
+                    .collect(Collectors.toList());
+            Collections.reverse(dtoList);
+
+            publisher.broadcast(me.getId(), other.getId(), dtoList);
+
+            return new ApiResponse<>(200, "发送成功", dto);
+        } catch (IllegalStateException ex) {
+            return new ApiResponse<>(400, ex.getMessage(), null);
         }
-        List<PrivateMessageDTO> dtoList = pmPage.getContent().stream()
-                .map(m -> toDTO(m, profileMap))
-                .collect(Collectors.toList());
-        Collections.reverse(dtoList);
-
-        publisher.broadcast(me.getId(), other.getId(), dtoList);
-
-        return new ApiResponse<>(200, "发送成功", dto);
     }
 
     private String saveMessageMediaFile(MultipartFile file) throws IOException {

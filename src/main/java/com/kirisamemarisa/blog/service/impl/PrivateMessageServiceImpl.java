@@ -8,6 +8,7 @@ import com.kirisamemarisa.blog.model.User;
 import com.kirisamemarisa.blog.repository.PrivateMessageRepository;
 import com.kirisamemarisa.blog.service.FollowService;
 import com.kirisamemarisa.blog.service.PrivateMessageService;
+import com.kirisamemarisa.blog.service.BlockService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,14 +23,23 @@ public class PrivateMessageServiceImpl implements PrivateMessageService {
     private static final Logger logger = LoggerFactory.getLogger(PrivateMessageServiceImpl.class);
     private final PrivateMessageRepository messageRepository;
     private final FollowService followService;
+    private final BlockService blockService;
 
-    public PrivateMessageServiceImpl(PrivateMessageRepository messageRepository, FollowService followService) {
+    public PrivateMessageServiceImpl(PrivateMessageRepository messageRepository,
+                                     FollowService followService,
+                                     BlockService blockService) {
         this.messageRepository = messageRepository;
         this.followService = followService;
+        this.blockService = blockService;
     }
 
     @Override
     public PrivateMessage sendText(User sender, User receiver, String text) {
+        // 拦截：如果 sender 被 receiver 拉黑，则禁止发送
+        if (blockService != null && blockService.isBlocked(receiver, sender)) {
+            throw new IllegalStateException("对方已将你拉黑，无法发送私信。");
+        }
+
         PrivateMessage msg = new PrivateMessage();
         msg.setSender(sender);
         msg.setReceiver(receiver);
@@ -57,6 +67,11 @@ public class PrivateMessageServiceImpl implements PrivateMessageService {
     @Override
     public PrivateMessage sendMedia(User sender, User receiver, PrivateMessage.MessageType type, String mediaUrl,
                                     String caption) {
+        // 拦截：如果 sender 被 receiver 拉黑，则禁止发送
+        if (blockService != null && blockService.isBlocked(receiver, sender)) {
+            throw new IllegalStateException("对方已将你拉黑，无法发送私信。");
+        }
+
         if (!canSendMedia(sender, receiver)) {
             throw new IllegalStateException("发送媒体需互相关注或对方已回复。");
         }
