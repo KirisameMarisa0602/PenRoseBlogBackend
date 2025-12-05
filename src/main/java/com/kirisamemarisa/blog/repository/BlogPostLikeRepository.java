@@ -9,9 +9,9 @@ public interface BlogPostLikeRepository extends JpaRepository<BlogPostLike, Long
     Optional<BlogPostLike> findByBlogPostIdAndUserId(Long blogPostId, Long userId);
     long countByBlogPostId(Long blogPostId);
 
-    // 新增：根据博客 ID 删除点赞
-    void deleteByBlogPostId(Long blogPostId);
+    // 根据博客 ID 删除点赞
+    void deleteByBlogPost_Id(Long blogPostId);
 
-    // 新增：根据多条博客 ID 批量删除点赞（目前用不到，预留）
-    void deleteByBlogPostIdIn(List<Long> blogPostIds);
+    // 根据多条博客 ID 批量删除点赞（目前用不到，预留）
+    void deleteByBlogPost_IdIn(List<Long> blogPostIds);
 }

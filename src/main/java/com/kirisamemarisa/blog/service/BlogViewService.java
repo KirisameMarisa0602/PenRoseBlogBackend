@@ -15,4 +15,10 @@ public interface BlogViewService {
      * 获取指定博客的浏览统计
      */
     ApiResponse<BlogViewStatsDTO> getStats(Long blogPostId);
+
+    /**
+     * 删除指定博客的所有浏览相关数据（明细 + 统计）
+     */
+    void deleteByBlogPostId(Long blogPostId);
+
 }

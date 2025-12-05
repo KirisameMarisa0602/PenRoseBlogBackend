@@ -11,9 +11,9 @@ public interface CommentReplyLikeRepository extends JpaRepository<CommentReplyLi
 
     long countByReplyId(Long replyId);
 
-    // 新增：根据回复 ID 删除点赞
-    void deleteByReplyId(Long replyId);
+    // 根据回复 ID 删除点赞
+    void deleteByReply_Id(Long replyId);
 
-    // 新增：根据多条回复批量删除点赞
-    void deleteByReplyIdIn(List<Long> replyIds);
+    // 根据多条回复批量删除点赞
+    void deleteByReply_IdIn(List<Long> replyIds);
 }

@@ -9,9 +9,9 @@ public interface CommentLikeRepository extends JpaRepository<CommentLike, Long> 
     Optional<CommentLike> findByCommentIdAndUserId(Long commentId, Long userId);
     long countByCommentId(Long commentId);
 
-    // 新增：根据评论 ID 删除点赞
-    void deleteByCommentId(Long commentId);
+    // 根据评论 ID 删除点赞
+    void deleteByComment_Id(Long commentId);
 
-    // 新增：根据多条评论批量删除点赞
-    void deleteByCommentIdIn(List<Long> commentIds);
+    // 根据多条评论批量删除点赞
+    void deleteByComment_IdIn(List<Long> commentIds);
 }

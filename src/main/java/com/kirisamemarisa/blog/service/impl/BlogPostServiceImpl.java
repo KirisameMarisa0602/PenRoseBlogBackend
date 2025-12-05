@@ -8,6 +8,7 @@ import com.kirisamemarisa.blog.dto.*;
 import com.kirisamemarisa.blog.model.*;
 import com.kirisamemarisa.blog.repository.*;
 import com.kirisamemarisa.blog.service.BlogPostService;
+import com.kirisamemarisa.blog.service.BlogViewService;
 import com.kirisamemarisa.blog.mapper.BlogPostMapper;
 import com.kirisamemarisa.blog.service.CommentService;
 import com.kirisamemarisa.blog.service.NotificationService;
@@ -44,6 +45,7 @@ public class BlogPostServiceImpl implements BlogPostService {
     private final BlogPostMapper blogpostMapper;
     private final CommentService commentService;
     private final NotificationService notificationService;
+    private final BlogViewService blogViewService;   // 新增：浏览相关服务
 
     @Value("${resource.blogpostcover-location}")
     private String blogpostcoverLocation;
@@ -58,7 +60,8 @@ public class BlogPostServiceImpl implements BlogPostService {
                                UserProfileRepository userProfileRepository,
                                BlogPostMapper blogpostMapper,
                                CommentService commentService,
-                               NotificationService notificationService) {
+                               NotificationService notificationService,
+                               BlogViewService blogViewService) {
         this.blogPostRepository = blogPostRepository;
         this.userRepository = userRepository;
         this.commentRepository = commentRepository;
@@ -70,6 +73,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         this.blogpostMapper = blogpostMapper;
         this.commentService = commentService;
         this.notificationService = notificationService;
+        this.blogViewService = blogViewService;
     }
 
     @Override
@@ -377,6 +381,7 @@ public class BlogPostServiceImpl implements BlogPostService {
         return new ApiResponse<>(200, "更新成功", true);
     }
 
+    // 只展示 delete 方法，其余保持你当前版本不变
     @Override
     @Transactional
     public ApiResponse<Boolean> delete(Long blogPostId, Long userId) {
@@ -395,40 +400,45 @@ public class BlogPostServiceImpl implements BlogPostService {
         }
 
         // 1. 找到该博客下所有评论
-        List<Comment> comments = commentRepository.findByBlogPostId(blogPostId);
+        List<Comment> comments = commentRepository.findByBlogPost_Id(blogPostId);
         List<Long> commentIds = comments.stream()
                 .map(Comment::getId)
                 .collect(Collectors.toList());
 
         if (!commentIds.isEmpty()) {
-            // 2. 根据评论 ID 找到所有楼中楼回复
-            List<CommentReply> replies = commentReplyRepository.findAll().stream()
-                    .filter(r -> r.getComment() != null && commentIds.contains(r.getComment().getId()))
-                    .collect(Collectors.toList());
+            // 2. 根据评论 ID 批量查询所有楼中楼回复（只查相关评论，不全表扫）
+            List<CommentReply> replies = commentReplyRepository.findByComment_IdIn(commentIds);
             List<Long> replyIds = replies.stream()
                     .map(CommentReply::getId)
                     .collect(Collectors.toList());
 
             // 3. 先删回复的点赞
             if (!replyIds.isEmpty()) {
-                commentReplyLikeRepository.deleteByReplyIdIn(replyIds);
+                commentReplyLikeRepository.deleteByReply_IdIn(replyIds);
             }
             // 4. 再删回复本身
             if (!commentIds.isEmpty()) {
-                commentReplyRepository.deleteByCommentIdIn(commentIds);
+                commentReplyRepository.deleteByComment_IdIn(commentIds);
             }
 
             // 5. 删评论的点赞
-            commentLikeRepository.deleteByCommentIdIn(commentIds);
+            commentLikeRepository.deleteByComment_IdIn(commentIds);
 
-            // 6. 删评论本身（也可以依靠 BlogPost 上的 cascade，这里显式删除更清晰）
-            commentRepository.deleteByBlogPostId(blogPostId);
+            // 6. 删评论本身
+            commentRepository.deleteByBlogPost_Id(blogPostId);
         }
 
         // 7. 删文章的点赞
-        blogPostLikeRepository.deleteByBlogPostId(blogPostId);
+        blogPostLikeRepository.deleteByBlogPost_Id(blogPostId);
 
-        // 8. 最后删博客
+        // 8. 删文章的浏览记录和统计（必须在删 blog_post 之前）
+        try {
+            blogViewService.deleteByBlogPostId(blogPostId);
+        } catch (Exception e) {
+            logger.warn("删除博客 {} 的浏览数据失败", blogPostId, e);
+        }
+
+        // 9. 最后删博客
         blogPostRepository.delete(post);
 
         return new ApiResponse<>(200, "删除成功", true);

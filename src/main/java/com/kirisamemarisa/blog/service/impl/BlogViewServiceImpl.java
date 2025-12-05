@@ -100,4 +100,24 @@ public class BlogViewServiceImpl implements BlogViewService {
         BlogViewStatsDTO dto = blogViewStatsMapper.toDTO(statsOpt.get());
         return new ApiResponse<>(200, "获取成功", dto);
     }
+
+    @Override
+    @Transactional
+    public void deleteByBlogPostId(Long blogPostId) {
+        if (blogPostId == null) return;
+
+        try {
+            // 先删明细，再删统计，避免外键约束
+            blogViewRecordRepository.deleteByBlogPost_Id(blogPostId);
+        } catch (Exception e) {
+            logger.warn("删除博客 {} 的浏览明细失败", blogPostId, e);
+        }
+
+        try {
+            blogViewStatsRepository.deleteByBlogPost_Id(blogPostId);
+        } catch (Exception e) {
+            logger.warn("删除博客 {} 的浏览统计失败", blogPostId, e);
+        }
+    }
+
 }
