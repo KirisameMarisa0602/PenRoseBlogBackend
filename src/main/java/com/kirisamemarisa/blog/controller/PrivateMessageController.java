@@ -14,7 +14,7 @@ import com.kirisamemarisa.blog.dto.ConversationSummaryDTO;
 import com.kirisamemarisa.blog.repository.UserProfileRepository;
 import com.kirisamemarisa.blog.service.NotificationService;
 import com.kirisamemarisa.blog.dto.NotificationDTO;
-import com.kirisamemarisa.blog.service.BlogUrlPreviewService; // NEW
+import com.kirisamemarisa.blog.service.BlogUrlPreviewService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -42,7 +42,7 @@ public class PrivateMessageController {
     private final MessageEventPublisher publisher;
     private final UserProfileRepository userProfileRepository;
     private final NotificationService notificationService;
-    private final BlogUrlPreviewService blogUrlPreviewService; // NEW
+    private final BlogUrlPreviewService blogUrlPreviewService;
 
     @Value("${resource.message-media-location:uploads/messages}")
     private String messageMediaLocation;
@@ -56,14 +56,14 @@ public class PrivateMessageController {
                                     MessageEventPublisher publisher,
                                     UserProfileRepository userProfileRepository,
                                     NotificationService notificationService,
-                                    BlogUrlPreviewService blogUrlPreviewService) { // CHANGED
+                                    BlogUrlPreviewService blogUrlPreviewService) {
         this.userRepository = userRepository;
         this.privateMessageService = privateMessageService;
         this.privateMessageRepository = privateMessageRepository;
         this.publisher = publisher;
         this.userProfileRepository = userProfileRepository;
         this.notificationService = notificationService;
-        this.blogUrlPreviewService = blogUrlPreviewService; // NEW
+        this.blogUrlPreviewService = blogUrlPreviewService;
     }
 
     private User resolveCurrent(UserDetails principal, Long headerUserId) {
@@ -109,7 +109,7 @@ public class PrivateMessageController {
             }
         }
 
-        // NEW: 如果包含站内博客链接，生成预览
+        // 如果包含站内博客链接，生成预览
         dto.setBlogPreview(blogUrlPreviewService.extractPreviewFromText(dto.getText()));
 
         return dto;
@@ -137,7 +137,6 @@ public class PrivateMessageController {
         // 简单鉴权：userId 必须等于当前登录的用户
         User me = resolveCurrent(principal, headerUserId);
         if (me == null || !Objects.equals(me.getId(), userId)) {
-            // 认证失败时直接返回一个立刻完成的 emitter，前端会 fallback 到轮询
             SseEmitter emitter = new SseEmitter(0L);
             emitter.complete();
             return emitter;
@@ -150,7 +149,6 @@ public class PrivateMessageController {
             return emitter;
         }
 
-        // 初始数据：可以取最近一页消息（与前端 /conversation?page=0&size=20 对齐）
         Pageable pageable = PageRequest.of(0, 20);
         Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
 
@@ -169,10 +167,8 @@ public class PrivateMessageController {
         List<PrivateMessageDTO> dtoList = pmPage.getContent().stream()
                 .map(msg -> toDTO(msg, profileMap))
                 .collect(Collectors.toList());
-        // 与前端相同：按时间升序
         Collections.reverse(dtoList);
 
-        // 使用你已经实现的 MessageEventPublisher 建立 SSE 连接
         return publisher.subscribe(me.getId(), other.getId(), dtoList);
     }
 
@@ -187,11 +183,9 @@ public class PrivateMessageController {
         User other = userRepository.findById(otherId).orElse(null);
         if (other == null) return new ApiResponse<>(404, "用户不存在", null);
 
-        // 1. 获取分页数据（按时间倒序：最新的在 Page 0）
         Pageable pageable = PageRequest.of(page, size);
         Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
 
-        // 2. 批量提取用户 ID，一次性查询 Profile，解决 N+1 问题
         Set<Long> userIds = new HashSet<>();
         pmPage.getContent().forEach(m -> {
             if (m.getSender() != null) userIds.add(m.getSender().getId());
@@ -204,18 +198,14 @@ public class PrivateMessageController {
             profiles.forEach(p -> profileMap.put(p.getId(), p));
         }
 
-        // 3. 转换为 DTO
         List<PrivateMessageDTO> dtoList = pmPage.getContent().stream()
                 .map(msg -> toDTO(msg, profileMap))
                 .collect(Collectors.toList());
 
-        // 4. 反转列表：将倒序查出的 [最新, 次新...] 反转为 [次新, 最新]
         Collections.reverse(dtoList);
 
         return new ApiResponse<>(200, "OK", new PageResult<>(dtoList, pmPage.getTotalElements(), page, size));
     }
-
-    // ... 其余方法（listConversations / unreadTotal / markRead / choosePreview / sendPmNotification）保持不变 ...
 
     @GetMapping("/conversation/list")
     public ApiResponse<PageResult<ConversationSummaryDTO>> listConversations(
@@ -319,7 +309,6 @@ public class PrivateMessageController {
             dto.setReferenceId(msg.getId()); // 业务主键：私信ID
 
             Long receiverId = dto.getReceiverId();
-            // 不给自己发通知
             if (receiverId != null && !receiverId.equals(dto.getSenderId())) {
                 notificationService.sendNotification(receiverId, dto);
             }
@@ -340,10 +329,10 @@ public class PrivateMessageController {
             PrivateMessage msg = privateMessageService.sendText(me, other, body.getText());
             PrivateMessageDTO dto = toDTOSingle(msg);
 
-            // 通知（系统级）
+            // 系统级通知
             sendPmNotification(msg);
 
-            // 会话最新一页，用于 SSE 推送
+            // 最新一页，用于 SSE 广播
             Pageable pageable = PageRequest.of(0, 20);
             Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
 
@@ -362,12 +351,10 @@ public class PrivateMessageController {
                     .collect(Collectors.toList());
             Collections.reverse(dtoList);
 
-            // SSE 广播给当前会话双方
             publisher.broadcast(me.getId(), other.getId(), dtoList);
 
             return new ApiResponse<>(200, "发送成功", dto);
         } catch (IllegalStateException ex) {
-            // 例如：被拉黑 / 不允许发送等业务拒绝
             return new ApiResponse<>(400, ex.getMessage(), null);
         }
     }
@@ -388,7 +375,6 @@ public class PrivateMessageController {
 
             sendPmNotification(msg);
 
-            // 同样推送最新一页
             Pageable pageable = PageRequest.of(0, 20);
             Page<PrivateMessage> pmPage = privateMessageService.conversationPage(me, other, pageable);
 

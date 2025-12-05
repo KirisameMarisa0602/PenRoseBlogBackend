@@ -23,8 +23,7 @@ public class NotificationEventPublisher {
 
     private final Map<Long, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
-    // Executor to decouple SSE writes from request threads so failures don't affect
-    // callers
+    // Executor to decouple SSE writes from request threads so failures don't affect callers
     private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r, "sse-notification-%d".formatted(Thread.currentThread().getId()));
         t.setDaemon(true);
@@ -41,11 +40,9 @@ public class NotificationEventPublisher {
             remove(userId, emitter);
         });
         if (initial != null) {
-            // send both a named 'init' event and a default message payload
             try {
                 emitter.send(SseEmitter.event().name("init").data(initial));
             } catch (IOException ignored) {
-                // client might have gone away before subscription finished
                 logger.debug("Failed to send initial named event to user {}: connection may be closed", userId);
             } catch (Exception ex) {
                 logger.warn("Unexpected error sending initial named event to user {}: {}", userId, ex.toString());
@@ -63,7 +60,6 @@ public class NotificationEventPublisher {
     }
 
     public void sendNotification(Long userId, Object payload) {
-        // make a defensive snapshot of emitters to avoid concurrent modification issues
         try {
             Set<SseEmitter> set = emitters.get(userId);
             if (set == null || set.isEmpty())
@@ -71,40 +67,28 @@ public class NotificationEventPublisher {
 
             List<SseEmitter> snapshot = new ArrayList<>(set);
             for (SseEmitter em : snapshot) {
-                // send each notification asynchronously so that a slow/closed client
-                // cannot cause the current request to fail. Wrap the whole task so
-                // that no Throwable can escape the executor thread.
                 executor.submit(() -> {
                     try {
                         try {
-                            // first try named event
                             em.send(SseEmitter.event().name("notification").data(payload));
                         } catch (IOException e) {
-                            logger.debug("Failed to send named notification to user {} emitter: {}", userId,
-                                    e.toString());
-                            // remove dead emitter
+                            logger.debug("Failed to send named notification to user {} emitter: {}", userId, e.toString());
                             remove(userId, em);
                             return;
                         } catch (Exception e) {
-                            logger.warn("Unexpected error sending named notification to user {}: {}", userId,
-                                    e.toString());
+                            logger.warn("Unexpected error sending named notification to user {}: {}", userId, e.toString());
                         }
 
                         try {
-                            // then also send default message for onmessage compatibility
                             em.send(payload);
                         } catch (IOException e) {
-                            logger.debug("Failed to send default notification to user {} emitter: {}", userId,
-                                    e.toString());
+                            logger.debug("Failed to send default notification to user {} emitter: {}", userId, e.toString());
                             remove(userId, em);
                         } catch (Exception e) {
-                            logger.warn("Unexpected error sending default notification to user {}: {}", userId,
-                                    e.toString());
+                            logger.warn("Unexpected error sending default notification to user {}: {}", userId, e.toString());
                         }
                     } catch (Throwable t) {
-                        // Catch anything unexpected to avoid letting exceptions escape the executor
-                        logger.warn("Unhandled throwable while delivering notification to user {} emitter: {}", userId,
-                                t.toString());
+                        logger.warn("Unhandled throwable while delivering notification to user {} emitter: {}", userId, t.toString());
                         try {
                             remove(userId, em);
                         } catch (Exception ignore) {
@@ -113,7 +97,6 @@ public class NotificationEventPublisher {
                 });
             }
         } catch (Throwable t) {
-            // ensure nothing escapes to the servlet container
             logger.warn("Unexpected throwable in sendNotification for user {}: {}", userId, t.toString());
         }
     }

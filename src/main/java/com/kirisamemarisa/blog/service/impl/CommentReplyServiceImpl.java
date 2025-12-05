@@ -79,26 +79,30 @@ public class CommentReplyServiceImpl implements CommentReplyService {
 
         // 通知被回复的评论作者
         try {
-            if (notificationService != null) {
-                Comment comment = commentOpt.get();
-                if (comment.getUser() != null && reply.getUser() != null) {
-                    Long commentAuthorId = comment.getUser().getId();
-                    Long replierId = reply.getUser().getId();
-                    if (commentAuthorId != null && !commentAuthorId.equals(replierId)) {
-                        NotificationDTO n = new NotificationDTO();
-                        n.setType("COMMENT_REPLY");  // 收到回复
-                        n.setSenderId(replierId);
-                        n.setReceiverId(commentAuthorId);
-                        n.setMessage("你的评论收到了新的回复");
-                        n.setCreatedAt(Instant.now());
-                        n.setReferenceId(reply.getId());        // 回复ID
-                        n.setReferenceExtraId(comment.getId()); // 原评论ID
-                        notificationService.sendNotification(commentAuthorId, n);
+                        if (notificationService != null) {
+                             Comment comment = commentOpt.get();
+                                if (comment.getUser() != null && reply.getUser() != null) {
+                                        Long commentAuthorId = comment.getUser().getId();
+                                        Long replierId = reply.getUser().getId();
+                                        if (commentAuthorId != null && !commentAuthorId.equals(replierId)) {
+                                                Long blogPostId = (comment.getBlogPost() != null
+                                                                ? comment.getBlogPost().getId()
+                                                                : null);
+                                                NotificationDTO n = new NotificationDTO();
+                                                n.setType("COMMENT_REPLY");  // 统一类型
+                                                n.setSenderId(replierId);
+                                                n.setReceiverId(commentAuthorId);
+                                               n.setMessage("你的评论收到了新的回复");
+                                               n.setCreatedAt(Instant.now());
+                                                // 关键：统一约定
+                                                        n.setReferenceId(reply.getId());     // 回复 ID（前端可视为“被高亮的评论/回复 ID”）
+                                                n.setReferenceExtraId(blogPostId);   // 文章 ID
+                                                notificationService.sendNotification(commentAuthorId, n);
+                                            }
+                                    }
+                            }
+                    } catch (Exception ignored) {
                     }
-                }
-            }
-        } catch (Exception ignored) {
-        }
 
         return new ApiResponse<>(200, "回复成功", reply.getId());
     }
@@ -183,26 +187,28 @@ public class CommentReplyServiceImpl implements CommentReplyService {
             replyRepository.save(reply);
 
             // 楼中楼被点赞通知
-            try {
-                if (notificationService != null && reply.getUser() != null) {
-                    Long authorId = reply.getUser().getId();
-                    Long likerId = userId;
-                    if (authorId != null && !authorId.equals(likerId)) {
-                        NotificationDTO n = new NotificationDTO();
-                        n.setType("REPLY_LIKE");
-                        n.setSenderId(likerId);
-                        n.setReceiverId(authorId);
-                        n.setMessage("你的回复收到了一个点赞");
-                        n.setCreatedAt(Instant.now());
-                        n.setReferenceId(reply.getId());
-                        if (reply.getComment() != null) {
-                            n.setReferenceExtraId(reply.getComment().getId());
-                        }
-                        notificationService.sendNotification(authorId, n);
-                    }
-                }
-            } catch (Exception ignored) {
-            }
+                        try {
+                                if (notificationService != null && reply.getUser() != null) {
+                                        Long authorId = reply.getUser().getId();
+                                        Long likerId = userId;
+                                        if (authorId != null && !authorId.equals(likerId)) {
+                                                Long blogPostId = null;
+                                                if (reply.getComment() != null && reply.getComment().getBlogPost() != null) {
+                                                        blogPostId = reply.getComment().getBlogPost().getId();
+                                                    }
+                                                NotificationDTO n = new NotificationDTO();
+                                                n.setType("REPLY_LIKE");
+                                                n.setSenderId(likerId);
+                                                n.setReceiverId(authorId);
+                                                n.setMessage("你的回复收到了一个点赞");
+                                                n.setCreatedAt(Instant.now());
+                                                n.setReferenceId(reply.getId());    // 被点赞的回复 ID
+                                                n.setReferenceExtraId(blogPostId);  // 所在文章 ID
+                                                notificationService.sendNotification(authorId, n);
+                                            }
+                                    }
+                            } catch (Exception ignored) {
+                            }
 
             return new ApiResponse<>(200, "点赞成功", true);
         }

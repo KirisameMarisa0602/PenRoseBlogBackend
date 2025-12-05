@@ -17,7 +17,10 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationEventPublisher publisher;
 
-    // optional bridge; may be null if RabbitMQ support is not on the classpath or not configured
+    /**
+     * 可选：通过 RabbitMQ 暂存通知的桥接组件。
+     * 如果类路径上没有 RabbitMQ 支持或未配置，则为 null，本地直接 SSE 推送。
+     */
     @Autowired(required = false)
     private RabbitNotificationBridge rabbitBridge;
 
@@ -30,9 +33,16 @@ public class NotificationServiceImpl implements NotificationService {
         return publisher.subscribe(userId, initialPayload);
     }
 
+    /**
+     * 统一的通知发送入口：
+     * - 优先通过 RabbitMQ 暂存（异步投递）。
+     * - 若 RabbitMQ 不可用或发送失败，则回退到本地 SSE 推送。
+     */
     @Override
     public void sendNotification(Long userId, NotificationDTO payload) {
         if (payload == null || userId == null) return;
+
+        // RabbitMQ 优先
         if (rabbitBridge != null) {
             try {
                 NotificationMessage m = new NotificationMessage();
@@ -48,10 +58,14 @@ public class NotificationServiceImpl implements NotificationService {
                 rabbitBridge.publish(m);
                 return;
             } catch (Exception ex) {
-                logger.warn("Failed to publish notification via Rabbit bridge: {}. Falling back to local send", ex.toString());
+                logger.warn(
+                        "Failed to publish notification via Rabbit bridge: {}. Falling back to local send",
+                        ex.toString()
+                );
             }
         }
-        // fallback to local delivery
+
+        // fallback 到本地 SSE 推送
         publisher.sendNotification(userId, payload);
     }
 
